@@ -242,3 +242,9 @@ describe what is done to (partly) ensure safety of the host machine when compili
    distinct UID, and call `ulimit` for that user. This serves as a workaround for per-container limits.
    
    Don't forget to `chmod g+w` for files that need to be accessed from host.
+
+## TODO's
+
+- [ ] Ability to checkout certain commits for compilation
+- [ ] Compiler matrix for different versions and configurations
+  - [ ] Enumerate over all tags
