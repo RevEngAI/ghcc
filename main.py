@@ -7,6 +7,7 @@ r"""Run the cloning--compilation pipeline. What happens is:
 """
 
 import functools
+import json
 import os
 import shutil
 import subprocess
@@ -302,7 +303,19 @@ def iter_repos(db: ghcc.RepoDB, repo_list_path: str, max_count: Optional[int] = 
     with open(repo_list_path, "r") as repo_file:
         # config file can be a .json file, or .txt file
         if repo_list_path.endswith(".json"):
-            pass
+            j_data = json.load(repo_file)
+            for repo in j_data["repos"]:
+                url = repo["url"]
+                if url.endswith(".git"):
+                    url = url[:-len(".git")]
+                repo_owner, repo_name = url.split("/")[-2:]
+                # db_result = db.get(repo_owner, repo_name)
+                db_result = db_entries.get((repo_owner, repo_name), None)
+                # when reading from a .txt file, we only have a URL, no branch, commit_id, or tag info
+                yield RepoInfo(index, repo_owner, repo_name, repo["branch"], repo["commit"], repo["tag"], db_result)
+                index += 1
+                if max_count is not None and index >= max_count:
+                    break
         elif repo_list_path.endswith(".txt"):
             for line in repo_file:
                 if not line:
