@@ -22,6 +22,23 @@ cd ghcc
 
 > This script assumes you are running in the ghcc folder, calling this from any other directory will result in an error.
 
+#### database-config.json
+
+You can then replace the contents of the `database-config.json` file to the values below:
+
+```json
+{
+  "host": "localhost",
+  "port": 27017,
+  "auth_db_name": "admin",
+  "db_name": "ghcc",
+  "username": "gchh_crawler",
+  "password": "securepassword"
+}
+```
+
+These are based on the values used in the mongodb setup in `scripts/system_setup.sh`
+
 ### Full setup
 
 1. Install [Docker](https://docs.docker.com/install/) and [MongoDB](https://docs.mongodb.com/manual/installation/).

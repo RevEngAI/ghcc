@@ -44,7 +44,8 @@ sudo apt update
 sudo apt install -y mongodb-org
 # start the mongodb service so the tool can connect to it
 sudo systemctl start mongod
-# init the db
+# init the db with a default user, and create the ghcc table
+# you need to make sure that the values inside the database-config.json file match those below
 mongosh <<EOF
 use admin
 db.createUser({
