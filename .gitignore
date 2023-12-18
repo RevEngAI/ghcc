@@ -2,6 +2,7 @@
 ### Example user template
 
 database-config.json
+*.txt
 
 # IntelliJ project files
 .idea
