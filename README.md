@@ -243,6 +243,25 @@ describe what is done to (partly) ensure safety of the host machine when compili
    
    Don't forget to `chmod g+w` for files that need to be accessed from host.
 
+## URL Files
+
+### JSON
+
+If you have specific requirements for the branch, commit_id, or tag for a repo, you should use a .json URL file
+
+```json
+{
+    "repos": [
+        {
+            "url": "https:github.com/example/test.git",
+            "branch": "master",
+            "commit": "123456789abcdef",
+            "tag": "v0.1"
+        }
+    ]
+}
+```
+
 ## TODO's
 
 - [ ] Ability to checkout certain commits for compilation
