@@ -10,6 +10,20 @@ adapted from [CMUSTRUDEL/DIRE](https://github.com/CMUSTRUDEL/DIRE).
 
 ## Setup
 
+### Quickstart
+
+You can use `setup_system.sh` to setup an ubuntu machine to run this project
+
+```sh
+git clone https://github.com/mov0xdecafe/ghcc.git
+cd ghcc
+./scripts/system_setup.sh
+```
+
+> This script assumes you are running in the ghcc folder, calling this from any other directory will result in an error.
+
+### Full setup
+
 1. Install [Docker](https://docs.docker.com/install/) and [MongoDB](https://docs.mongodb.com/manual/installation/).
 2. Install required Python packages by:
    ```bash
