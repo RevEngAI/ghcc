@@ -49,6 +49,9 @@ class RepoInfo(NamedTuple):
     idx: int  # `tuple` has an `index` method
     repo_owner: str
     repo_name: str
+    repo_branch: str
+    repo_commit_id: str
+    repo_tag: str
     db_result: Optional[RepoDB.Entry]
 
 
@@ -297,19 +300,27 @@ def iter_repos(db: ghcc.RepoDB, repo_list_path: str, max_count: Optional[int] = 
     flutes.log(f"{len(db_entries)} entries loaded from DB")
     index = 0
     with open(repo_list_path, "r") as repo_file:
-        for line in repo_file:
-            if not line:
-                continue
-            url = line.strip().rstrip("/")
-            if url.endswith(".git"):
-                url = url[:-len(".git")]
-            repo_owner, repo_name = url.split("/")[-2:]
-            # db_result = db.get(repo_owner, repo_name)
-            db_result = db_entries.get((repo_owner, repo_name), None)
-            yield RepoInfo(index, repo_owner, repo_name, db_result)
-            index += 1
-            if max_count is not None and index >= max_count:
-                break
+        # config file can be a .json file, or .txt file
+        if repo_list_path.endswith(".json"):
+            pass
+        elif repo_list_path.endswith(".txt"):
+            for line in repo_file:
+                if not line:
+                    continue
+                url = line.strip().rstrip("/")
+                if url.endswith(".git"):
+                    url = url[:-len(".git")]
+                repo_owner, repo_name = url.split("/")[-2:]
+                # db_result = db.get(repo_owner, repo_name)
+                db_result = db_entries.get((repo_owner, repo_name), None)
+                # when reading from a .txt file, we only have a URL, no branch, commit_id, or tag info
+                yield RepoInfo(index, repo_owner, repo_name, None, None, None, db_result)
+                index += 1
+                if max_count is not None and index >= max_count:
+                    break
+        else:
+            raise RuntimeError("Unsupported URL list file format")
+
 
 
 class MetaInfo:
