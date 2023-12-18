@@ -443,14 +443,14 @@ def main() -> None:
                 flutes.log(f"Processed {repo_count} repositories", force_console=True)
             if result is None:
                 continue
-            repo_owner, repo_name = result.repo_info.repo_owner, result.repo_info.repo_name
+            repo_owner, repo_name, repo_branch, repo_commit_id, repo_tag = result.repo_info.repo_owner, result.repo_info.repo_name, result.repo_info.repo_branch, result.repo_info.repo_commit_id, result.repo_info.repo_tag
             if args.write_db:
                 if result.clone_success is not None or result.repo_info.db_result is None:
                     # There's probably an inconsistency somewhere if we didn't clone while `db_result` is None.
                     # To prevent more errors, just add it to the DB.
                     repo_size = result.repo_size or -1  # a value of zero is probably also wrong
                     clone_success = result.clone_success if result.clone_success is not None else True
-                    db.add_repo(repo_owner, repo_name, clone_success, repo_size=repo_size)
+                    db.add_repo(repo_owner, repo_name, repo_branch, repo_commit_id, repo_tag, clone_success, repo_size=repo_size)
                     flutes.log(f"Added {repo_owner}/{repo_name} to DB")
                 if result.makefiles is not None:
                     update_result = db.update_makefile(repo_owner, repo_name, result.makefiles,

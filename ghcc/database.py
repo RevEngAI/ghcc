@@ -151,6 +151,9 @@ class RepoDB(Database):
         repo_owner: str
         repo_name: str
         repo_size: int  # size of the repo in bytes
+        repo_branch: str # name of the branch the repo is cloning from (default is master)
+        repo_commit_id: str # commit id for a branch (can be none)
+        repo_tag: str # tag to build from (can be none)
         clone_successful: bool  # whether the repo has been successfully cloned to the server
         compiled: bool  # whether the repo has been tested for compilation
         num_makefiles: int  # number of compilable Makefiles (required because MongoDB cannot aggregate list lengths)
@@ -175,12 +178,15 @@ class RepoDB(Database):
         """
         return self.collection.find_one({"repo_owner": repo_owner, "repo_name": repo_name})
 
-    def add_repo(self, repo_owner: str, repo_name: str, clone_successful: bool, repo_size: int = -1) -> None:
+    def add_repo(self, repo_owner: str, repo_name: str, repo_branch: str, repo_commit_id: str, repo_tag: str, clone_successful: bool, repo_size: int = -1) -> None:
         r"""Add a new DB entry for the specified repository. Arguments correspond to the first three fields in
         :class:`RepoEntry`. Other fields are set to sensible default values (``False`` and ``[]``).
 
         :param repo_owner: Owner of the repository.
         :param repo_name: Name of the repository.
+        :param repo_branch: Branch of the repo to clone from
+        :param repo_commit_id: Commit hash of point in time to compile
+        :param repo_tag: Tag from project
         :param clone_successful: Whether the repository was successfully cloned.
         :param repo_size: Size (in bytes) of the cloned repository, or ``-1`` (default) if cloning failed.
         """
@@ -189,6 +195,9 @@ class RepoDB(Database):
             record = {
                 "repo_owner": repo_owner,
                 "repo_name": repo_name,
+                "repo_branch": repo_branch,
+                "repo_commit_id": repo_commit_id,
+                "repo_tag": repo_tag,
                 "clone_successful": clone_successful,
                 "repo_size": repo_size,
                 "compiled": False,
