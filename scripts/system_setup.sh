@@ -42,6 +42,18 @@ sudo apt update
 
 # install latest version of mongodb from apt
 sudo apt install -y mongodb-org
+# start the mongodb service so the tool can connect to it
+sudo systemctl start mongod
+# init the db
+mongosh <<EOF
+use admin
+db.createUser({
+  user: 'gchh_crawler',
+  pwd: 'securepassword',
+  roles: [{ role: 'readWrite', db: 'ghcc' }]
+})
+use ghcc
+EOF
 
 pip install -r requirements.txt
 
