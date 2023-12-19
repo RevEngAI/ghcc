@@ -508,8 +508,8 @@ class MetaInfo:
 
     def __repr__(self) -> str:
         msg = (
-            f"#Repos: {self.num_repos} ({self.num_gitmodules} with .gitmodules), #Binaries: {self.num_binaries}\n"
-            f"#Makefiles: {self.num_makefiles} ({self.success_makefiles} succeeded, "
+            f"Repos: {self.num_repos} ({self.num_gitmodules} with .gitmodules), Binaries: {self.num_binaries}\n"
+            f"Makefiles: {self.num_makefiles} ({self.success_makefiles} succeeded, "
             f"{self.makefiles_using_automake} using automake)"
         )
         # f" ├─ New: {self.added_makefiles}, Missing: {self.missing_makefiles}\n" \
