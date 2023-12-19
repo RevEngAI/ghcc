@@ -13,7 +13,9 @@ from .database import RepoDB
 from .repo import clean
 from .utils.docker import run_docker_command
 
-MOCK_PATH = os.path.abspath(os.path.join(os.path.split(__file__)[0], "..", "..", "scripts", "mock_path"))
+MOCK_PATH = os.path.abspath(
+    os.path.join(os.path.split(__file__)[0], "..", "..", "scripts", "mock_path")
+)
 
 ELF_FILE_TAG = b"ELF"  # Linux
 
@@ -69,12 +71,20 @@ class CompileResult(NamedTuple):
     captured_output: Optional[str] = None
 
 
-def _create_result(success: bool = False, elf_files: Optional[List[str]] = None,
-                   error_type: Optional[CompileErrorType] = None,
-                   captured_output: Optional[str] = None) -> CompileResult:
+def _create_result(
+    success: bool = False,
+    elf_files: Optional[List[str]] = None,
+    error_type: Optional[CompileErrorType] = None,
+    captured_output: Optional[str] = None,
+) -> CompileResult:
     if elf_files is None:
         elf_files = []
-    return CompileResult(success, elf_files=elf_files, error_type=error_type, captured_output=captured_output)
+    return CompileResult(
+        success,
+        elf_files=elf_files,
+        error_type=error_type,
+        captured_output=captured_output,
+    )
 
 
 def _check_elf_fn(directory: str, file: str) -> bool:
@@ -86,15 +96,19 @@ def _check_elf_fn(directory: str, file: str) -> bool:
     """
     path = os.path.join(directory, file)
     output = subprocess.check_output(["file", path], timeout=10)
-    output = output[len(path):]  # first part is file name
+    output = output[len(path) :]  # first part is file name
     return ELF_FILE_TAG in output
 
 
-def _make_skeleton(directory: str, timeout: Optional[float] = None,
-                   env: Optional[Dict[str, str]] = None,
-                   verbose: bool = True,
-                   *, make_fn,
-                   check_file_fn: Callable[[str, str], bool] = _check_elf_fn) -> CompileResult:
+def _make_skeleton(
+    directory: str,
+    timeout: Optional[float] = None,
+    env: Optional[Dict[str, str]] = None,
+    verbose: bool = True,
+    *,
+    make_fn,
+    check_file_fn: Callable[[str, str], bool] = _check_elf_fn,
+) -> CompileResult:
     r"""A composable routine for different compilation methods. Different routines can be composed by specifying
     different ``make_fn``\ s and ``check_file_fn``\ s.
 
@@ -121,49 +135,92 @@ def _make_skeleton(directory: str, timeout: Optional[float] = None,
 
     except subprocess.TimeoutExpired as e:
         # Even if exceptions occur, we still check for ELF files, just in case.
-        result = _create_result(error_type=CompileErrorType.Timeout, captured_output=e.output)
+        result = _create_result(
+            error_type=CompileErrorType.Timeout, captured_output=e.output
+        )
     except subprocess.CalledProcessError as e:
-        result = _create_result(error_type=CompileErrorType.CompileFailed, captured_output=e.output)
+        result = _create_result(
+            error_type=CompileErrorType.CompileFailed, captured_output=e.output
+        )
     except OSError as e:
-        result = _create_result(error_type=CompileErrorType.Unknown, captured_output=str(e))
+        result = _create_result(
+            error_type=CompileErrorType.Unknown, captured_output=str(e)
+        )
 
     try:
         # Use Git to find all unversioned files -- these would be the products of compilation.
-        output = run_command(["git", "ls-files", "--others"], cwd=directory,
-                             timeout=timeout, return_output=True).captured_output
+        output = run_command(
+            ["git", "ls-files", "--others"],
+            cwd=directory,
+            timeout=timeout,
+            return_output=True,
+        ).captured_output
         assert output is not None
         diff_files = [
             # files containing escape characters are in quotes
             file if file[0] != '"' else file[1:-1]
-            for file in output.decode('unicode_escape').split("\n") if file]  # file names could contain spaces
+            for file in output.decode("unicode_escape").split("\n")
+            if file
+        ]  # file names could contain spaces
 
         # Inspect each file and find ELF files.
         for file in diff_files:
             if check_file_fn(directory, file):
                 result.elf_files.append(file)
     except subprocess.TimeoutExpired as e:
-        return _create_result(elf_files=result.elf_files, error_type=CompileErrorType.Timeout, captured_output=e.output)
+        return _create_result(
+            elf_files=result.elf_files,
+            error_type=CompileErrorType.Timeout,
+            captured_output=e.output,
+        )
     except subprocess.CalledProcessError as e:
-        return _create_result(elf_files=result.elf_files, error_type=CompileErrorType.Unknown, captured_output=e.output)
+        return _create_result(
+            elf_files=result.elf_files,
+            error_type=CompileErrorType.Unknown,
+            captured_output=e.output,
+        )
     except OSError as e:
-        return _create_result(elf_files=result.elf_files, error_type=CompileErrorType.Unknown, captured_output=str(e))
+        return _create_result(
+            elf_files=result.elf_files,
+            error_type=CompileErrorType.Unknown,
+            captured_output=str(e),
+        )
 
     return result
 
 
-def _unsafe_make(directory: str, timeout: Optional[float] = None, env: Optional[Dict[str, str]] = None,
-                 verbose: bool = False) -> None:
+def _unsafe_make(
+    directory: str,
+    timeout: Optional[float] = None,
+    env: Optional[Dict[str, str]] = None,
+    verbose: bool = False,
+) -> None:
     env = {"PATH": f"{MOCK_PATH}:{os.environ['PATH']}", **(env or {})}
     # Try GNU Automake first. Note that errors are ignored because it's possible that the original files still work.
     if contains_files(directory, ["configure.ac", "configure.in"]):
         start_time = time.time()
         if os.path.isfile(os.path.join(directory, "autogen.sh")):
             # Some projects with non-trivial build instructions provide an "autogen.sh" script.
-            run_command(["chmod", "+x", "./autogen.sh"], env=env, cwd=directory, verbose=verbose)
-            run_command(["./autogen.sh"], env=env, cwd=directory, timeout=timeout, verbose=verbose, ignore_errors=True)
+            run_command(
+                ["chmod", "+x", "./autogen.sh"], env=env, cwd=directory, verbose=verbose
+            )
+            run_command(
+                ["./autogen.sh"],
+                env=env,
+                cwd=directory,
+                timeout=timeout,
+                verbose=verbose,
+                ignore_errors=True,
+            )
         else:
-            run_command(["autoreconf", "--force", "--install"],
-                        env=env, cwd=directory, timeout=timeout, ignore_errors=True, verbose=verbose)
+            run_command(
+                ["autoreconf", "--force", "--install"],
+                env=env,
+                cwd=directory,
+                timeout=timeout,
+                ignore_errors=True,
+                verbose=verbose,
+            )
         end_time = time.time()
         if timeout is not None:
             timeout = max(1.0, timeout - int(end_time - start_time))
@@ -171,13 +228,27 @@ def _unsafe_make(directory: str, timeout: Optional[float] = None, env: Optional[
     # Try running `./configure` if it exists.
     if os.path.isfile(os.path.join(directory, "configure")):
         start_time = time.time()
-        run_command(["chmod", "+x", "./configure"], env=env, cwd=directory, verbose=verbose)
-        ret = run_command(["./configure", "--disable-werror"], env=env, cwd=directory, timeout=timeout,
-                          verbose=verbose, ignore_errors=True)
+        run_command(
+            ["chmod", "+x", "./configure"], env=env, cwd=directory, verbose=verbose
+        )
+        ret = run_command(
+            ["./configure", "--disable-werror"],
+            env=env,
+            cwd=directory,
+            timeout=timeout,
+            verbose=verbose,
+            ignore_errors=True,
+        )
         end_time = time.time()
         if ret.return_code != 0 and end_time - start_time <= 2:
             # The configure file might not support `--disable-werror` and died instantly. Try again without the flag.
-            run_command(["./configure"], env=env, cwd=directory, timeout=timeout, verbose=verbose)
+            run_command(
+                ["./configure"],
+                env=env,
+                cwd=directory,
+                timeout=timeout,
+                verbose=verbose,
+            )
             end_time = time.time()
         if timeout is not None:
             timeout = max(1.0, timeout - int(end_time - start_time))
@@ -185,7 +256,13 @@ def _unsafe_make(directory: str, timeout: Optional[float] = None, env: Optional[
     # Make while ignoring errors.
     # `-B/--always-make` could give strange errors for certain Makefiles, e.g. ones containing "%:"
     try:
-        run_command(["make", "--keep-going", "-j1"], env=env, cwd=directory, timeout=timeout, verbose=verbose)
+        run_command(
+            ["make", "--keep-going", "-j1"],
+            env=env,
+            cwd=directory,
+            timeout=timeout,
+            verbose=verbose,
+        )
     except subprocess.CalledProcessError as err:
         expected_msg = b"missing separator"
         if not (err.output is not None and expected_msg in err.output):
@@ -193,11 +270,21 @@ def _unsafe_make(directory: str, timeout: Optional[float] = None, env: Optional[
         else:
             # Try again using BSD Make instead of GNU Make. Note BSD Make does not have a flag equivalent to
             # `-B/--always-make`.
-            run_command(["bmake", "-k", "-j1"], env=env, cwd=directory, timeout=timeout, verbose=verbose)
+            run_command(
+                ["bmake", "-k", "-j1"],
+                env=env,
+                cwd=directory,
+                timeout=timeout,
+                verbose=verbose,
+            )
 
 
-def unsafe_make(directory: str, timeout: Optional[float] = None, env: Optional[Dict[str, str]] = None,
-                verbose: bool = False) -> CompileResult:
+def unsafe_make(
+    directory: str,
+    timeout: Optional[float] = None,
+    env: Optional[Dict[str, str]] = None,
+    verbose: bool = False,
+) -> CompileResult:
     r"""Run ``make`` in the given directory and collect compilation outputs.
 
     .. warning::
@@ -216,23 +303,44 @@ def unsafe_make(directory: str, timeout: Optional[float] = None, env: Optional[D
     return _make_skeleton(directory, timeout, env, verbose, make_fn=_unsafe_make)
 
 
-def _docker_make(directory: str, timeout: Optional[float] = None, env: Optional[Dict[str, str]] = None,
-                 verbose: bool = False) -> None:
+def _docker_make(
+    directory: str,
+    timeout: Optional[float] = None,
+    env: Optional[Dict[str, str]] = None,
+    verbose: bool = False,
+) -> None:
     if os.path.isfile(os.path.join(directory, "configure")):
         # Try running `./configure` if it exists.
-        run_docker_command("chmod +x configure && ./configure && make --keep-going -j1",
-                           user=0, cwd="/usr/src", directory_mapping={directory: "/usr/src"},
-                           timeout=timeout, shell=True, env=env, verbose=verbose)
+        run_docker_command(
+            "chmod +x configure && ./configure && make --keep-going -j1",
+            user=0,
+            cwd="/usr/src",
+            directory_mapping={directory: "/usr/src"},
+            timeout=timeout,
+            shell=True,
+            env=env,
+            verbose=verbose,
+        )
     else:
         # Make while ignoring errors.
         # `-B/--always-make` could give strange errors for certain Makefiles, e.g. ones containing "%:"
-        run_docker_command(["make", "--keep-going", "-j1"],
-                           user=0, cwd="/usr/src", directory_mapping={directory: "/usr/src"},
-                           timeout=timeout, env=env, verbose=verbose)
+        run_docker_command(
+            ["make", "--keep-going", "-j1"],
+            user=0,
+            cwd="/usr/src",
+            directory_mapping={directory: "/usr/src"},
+            timeout=timeout,
+            env=env,
+            verbose=verbose,
+        )
 
 
-def docker_make(directory: str, timeout: Optional[float] = None, env: Optional[Dict[str, str]] = None,
-                verbose: bool = False) -> CompileResult:
+def docker_make(
+    directory: str,
+    timeout: Optional[float] = None,
+    env: Optional[Dict[str, str]] = None,
+    verbose: bool = False,
+) -> CompileResult:
     r"""Run ``make`` within Docker and collect compilation outputs.
 
     .. note::
@@ -267,11 +375,16 @@ def _hash_file_sha256(directory: str, path: str) -> str:
     return hash_obj.hexdigest()
 
 
-def compile_and_move(repo_binary_dir: str, repo_path: str, makefile_dirs: List[str],
-                     compile_timeout: Optional[float] = None, record_libraries: bool = False,
-                     gcc_override_flags: Optional[str] = None,
-                     compile_fn=docker_make, hash_fn: Callable[[str, str], str] = _hash_file_sha256) \
-        -> Iterator[RepoDB.MakefileEntry]:
+def compile_and_move(
+    repo_binary_dir: str,
+    repo_path: str,
+    makefile_dirs: List[str],
+    compile_timeout: Optional[float] = None,
+    record_libraries: bool = False,
+    gcc_override_flags: Optional[str] = None,
+    compile_fn=docker_make,
+    hash_fn: Callable[[str, str], str] = _hash_file_sha256,
+) -> Iterator[RepoDB.MakefileEntry]:
     r"""Compile all Makefiles as provided, and move generated binaries to the binary directory.
 
     :param repo_binary_dir: Path to the directory where generated binaries for the repository will be stored.
@@ -322,12 +435,18 @@ def compile_and_move(repo_binary_dir: str, repo_path: str, makefile_dirs: List[s
     clean(repo_path)
 
 
-def docker_batch_compile(repo_binary_dir: str, repo_path: str,
-                         compile_timeout: Optional[float] = None, record_libraries: bool = False,
-                         gcc_override_flags: Optional[str] = None,
-                         use_makefile_info_pkl: bool = False, verbose: bool = False,
-                         user_id: Optional[int] = None, directory_mapping: Optional[Dict[str, str]] = None,
-                         exception_log_fn=None) -> List[RepoDB.MakefileEntry]:
+def docker_batch_compile(
+    repo_binary_dir: str,
+    repo_path: str,
+    compile_timeout: Optional[float] = None,
+    record_libraries: bool = False,
+    gcc_override_flags: Optional[str] = None,
+    use_makefile_info_pkl: bool = False,
+    verbose: bool = False,
+    user_id: Optional[int] = None,
+    directory_mapping: Optional[Dict[str, str]] = None,
+    exception_log_fn=None,
+) -> List[RepoDB.MakefileEntry]:
     r"""Run batch compilation in Docker.
 
     :param repo_binary_dir: Path to store collected binaries.
@@ -353,20 +472,36 @@ def docker_batch_compile(repo_binary_dir: str, repo_path: str,
         cmd = [
             "batch_make.py",
             *(["--record-libraries"] if record_libraries else []),
-            *(["--compile-timeout", str(compile_timeout)] if compile_timeout is not None else []),
+            *(
+                ["--compile-timeout", str(compile_timeout)]
+                if compile_timeout is not None
+                else []
+            ),
             # We use "--flag=value" instead of "--flag value" because the GCC flags are, you know, flags, which may be
             # incorrectly interpreted by `argparse`.
-            *([f'--gcc-override-flags="{gcc_override_flags}"'] if gcc_override_flags is not None else []),
+            *(
+                [f'--gcc-override-flags="{gcc_override_flags}"']
+                if gcc_override_flags is not None
+                else []
+            ),
             *(["--use-makefile-info-pkl"] if use_makefile_info_pkl else []),
             *(["--verbose"] if verbose else []),
         ]
-        ret = run_docker_command(cmd, user=user_id, return_output=True,
-                                 directory_mapping={repo_path: "/usr/src/repo", repo_binary_dir: "/usr/src/bin",
-                                                    **(directory_mapping or {})})
+        ret = run_docker_command(
+            cmd,
+            user=user_id,
+            return_output=True,
+            directory_mapping={
+                repo_path: "/usr/src/repo",
+                repo_binary_dir: "/usr/src/bin",
+                **(directory_mapping or {}),
+            },
+        )
     except subprocess.CalledProcessError as e:
         end_time = time.time()
-        if ((compile_timeout is not None and end_time - start_time > compile_timeout) or
-                b"Resource temporarily unavailable" in e.output):
+        if (
+            compile_timeout is not None and end_time - start_time > compile_timeout
+        ) or b"Resource temporarily unavailable" in e.output:
             # Usually exceptions at this stage are due to some badly written Makefiles that gets trapped in an infinite
             # recursion. We suppress the exception and proceed normally, so we won't have to deal with it again when
             # the program is rerun.

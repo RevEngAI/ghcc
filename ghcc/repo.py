@@ -7,12 +7,7 @@ from typing import NamedTuple, Optional
 
 from flutes.run import run_command
 
-__all__ = [
-    "CloneErrorType",
-    "CloneResult",
-    "clean",
-    "clone"
-]
+__all__ = ["CloneErrorType", "CloneResult", "clean", "clone"]
 
 
 class CloneErrorType(Enum):
@@ -43,15 +38,29 @@ def clean(repo_folder: str) -> None:
     run_command(["git", "clean", "-xffd"], cwd=repo_folder, ignore_errors=True)
     # Do the same thing for submodules, if submodules exist.
     if os.path.exists(os.path.join(repo_folder, ".gitmodules")):
-        run_command(["git", "submodule", "foreach", "--recursive", "git", "reset", "--hard"],
-                    cwd=repo_folder, ignore_errors=True)
-        run_command(["git", "submodule", "foreach", "--recursive", "git", "clean", "-xffd"],
-                    cwd=repo_folder, ignore_errors=True)
+        run_command(
+            ["git", "submodule", "foreach", "--recursive", "git", "reset", "--hard"],
+            cwd=repo_folder,
+            ignore_errors=True,
+        )
+        run_command(
+            ["git", "submodule", "foreach", "--recursive", "git", "clean", "-xffd"],
+            cwd=repo_folder,
+            ignore_errors=True,
+        )
 
 
-def clone(repo_owner: str, repo_name: str, clone_folder: str, folder_name: Optional[str] = None, *,
-          default_branch: Optional[str] = None, timeout: Optional[float] = None,
-          recursive: bool = False, skip_if_exists: bool = True) -> CloneResult:
+def clone(
+    repo_owner: str,
+    repo_name: str,
+    clone_folder: str,
+    folder_name: Optional[str] = None,
+    *,
+    default_branch: Optional[str] = None,
+    timeout: Optional[float] = None,
+    recursive: bool = False,
+    skip_if_exists: bool = True,
+) -> CloneResult:
     r"""Clone a repository on GitHub, for instance, ``torvalds/linux``.
 
     :param repo_owner: Name of the repository owner, e.g., ``torvalds``.
@@ -89,7 +98,9 @@ def clone(repo_owner: str, repo_name: str, clone_folder: str, folder_name: Optio
         if not skip_if_exists:
             shutil.rmtree(clone_folder)
         else:
-            return CloneResult(repo_owner, repo_name, error_type=CloneErrorType.FolderExists)
+            return CloneResult(
+                repo_owner, repo_name, error_type=CloneErrorType.FolderExists
+            )
 
     # Certain repos might have turned private or been deleted, and git prompts for username/password when it happens.
     # Setting the environment variable `GIT_TERMINAL_PROMPT` to 0 could disable such behavior and let git fail promptly.
@@ -104,16 +115,30 @@ def clone(repo_owner: str, repo_name: str, clone_folder: str, folder_name: Optio
             try_branch = default_branch or "master"
             # Try cloning only 'master' branch, but it's possible there's no branch named 'master'.
             run_command(
-                ["git", "clone", "--depth=1", f"--branch={try_branch}", "--single-branch", url, clone_folder],
-                env=env, timeout=timeout)
+                [
+                    "git",
+                    "clone",
+                    "--depth=1",
+                    f"--branch={try_branch}",
+                    "--single-branch",
+                    url,
+                    clone_folder,
+                ],
+                env=env,
+                timeout=timeout,
+            )
             return
         except subprocess.CalledProcessError as err:
             expected_msg = b"fatal: Remote branch master not found in upstream origin"
-            if default_branch is not None or not (err.output is not None and expected_msg in err.output):
+            if default_branch is not None or not (
+                err.output is not None and expected_msg in err.output
+            ):
                 # If `default_branch` is specified, always re-raise the exception.
                 raise err
         # 'master' branch doesn't exist; do a shallow clone of all branches.
-        run_command(["git", "clone", "--depth=1", url, clone_folder], env=env, timeout=timeout)
+        run_command(
+            ["git", "clone", "--depth=1", url, clone_folder], env=env, timeout=timeout
+        )
 
     try:
         try_clone()
@@ -122,22 +147,46 @@ def clone(repo_owner: str, repo_name: str, clone_folder: str, folder_name: Optio
     except subprocess.CalledProcessError as e:
         no_ssh_expected_msg = b"fatal: could not read Username for 'https://github.com': terminal prompts disabled"
         ssh_expected_msg = b"remote: Repository not found."
-        if e.output is not None and (no_ssh_expected_msg in e.output or ssh_expected_msg in e.output):
-            return CloneResult(repo_owner, repo_name, error_type=CloneErrorType.PrivateOrNonexistent)
+        if e.output is not None and (
+            no_ssh_expected_msg in e.output or ssh_expected_msg in e.output
+        ):
+            return CloneResult(
+                repo_owner, repo_name, error_type=CloneErrorType.PrivateOrNonexistent
+            )
         else:
-            return CloneResult(repo_owner, repo_name, error_type=CloneErrorType.Unknown, captured_output=e.output)
+            return CloneResult(
+                repo_owner,
+                repo_name,
+                error_type=CloneErrorType.Unknown,
+                captured_output=e.output,
+            )
     except subprocess.TimeoutExpired as e:
-        return CloneResult(repo_owner, repo_name, error_type=CloneErrorType.Timeout, captured_output=e.output)
+        return CloneResult(
+            repo_owner,
+            repo_name,
+            error_type=CloneErrorType.Timeout,
+            captured_output=e.output,
+        )
 
     if recursive:
         submodule_timeout = (timeout - elapsed_time) if timeout is not None else None
         try:
             # If this fails, still treat it as a success, but include a special error type.
-            run_command(["git", "submodule", "update", "--init", "--recursive"],
-                        env=env, cwd=clone_folder, timeout=submodule_timeout)
+            run_command(
+                ["git", "submodule", "update", "--init", "--recursive"],
+                env=env,
+                cwd=clone_folder,
+                timeout=submodule_timeout,
+            )
         except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
-            return CloneResult(repo_owner, repo_name, success=True, time=elapsed_time,
-                               error_type=CloneErrorType.SubmodulesFailed, captured_output=e.output)
+            return CloneResult(
+                repo_owner,
+                repo_name,
+                success=True,
+                time=elapsed_time,
+                error_type=CloneErrorType.SubmodulesFailed,
+                captured_output=e.output,
+            )
         end_time = time.time()
         elapsed_time = end_time - start_time
 

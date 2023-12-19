@@ -13,10 +13,14 @@ __all__ = [
 ]
 
 
-def run_docker_command(command: Union[str, List[str]], cwd: Optional[str] = None,
-                       user: Optional[Union[int, Tuple[int, int]]] = None,
-                       directory_mapping: Optional[Dict[str, str]] = None,
-                       timeout: Optional[float] = None, **kwargs) -> CommandResult:
+def run_docker_command(
+    command: Union[str, List[str]],
+    cwd: Optional[str] = None,
+    user: Optional[Union[int, Tuple[int, int]]] = None,
+    directory_mapping: Optional[Dict[str, str]] = None,
+    timeout: Optional[float] = None,
+    **kwargs,
+) -> CommandResult:
     r"""Run a command inside a container based on the ``gcc-custom`` Docker image.
 
     :param command: The command to run. Should be either a `str` or a list of `str`. Note: they're treated the same way,
@@ -32,7 +36,7 @@ def run_docker_command(command: Union[str, List[str]], cwd: Optional[str] = None
     """
     # Validate `command` argument, and append call to `bash` if `shell` is True.
     if isinstance(command, list):
-        command = ' '.join(command)
+        command = " ".join(command)
     command = f"'{command}'"
 
     # Construct the `docker run` command.
@@ -59,16 +63,20 @@ def run_docker_command(command: Union[str, List[str]], cwd: Optional[str] = None
         # Timeout is implemented by calling `timeout` inside Docker container.
         docker_command.extend(["timeout", f"{timeout}s"])
     docker_command.append(command)
-    ret = run_command(' '.join(docker_command), shell=True, **kwargs)
+    ret = run_command(" ".join(docker_command), shell=True, **kwargs)
 
     # Check whether exceeded timeout limit by inspecting return code.
     if ret.return_code == 124:
         assert timeout is not None
-        raise error_wrapper(subprocess.TimeoutExpired(ret.command, timeout, output=ret.captured_output))
+        raise error_wrapper(
+            subprocess.TimeoutExpired(ret.command, timeout, output=ret.captured_output)
+        )
     return ret
 
 
-def verify_docker_image(verbose: bool = False, print_checked_paths: bool = False) -> bool:
+def verify_docker_image(
+    verbose: bool = False, print_checked_paths: bool = False
+) -> bool:
     r"""Checks whether the Docker image is up-to-date. This is done by verifying the modification dates for all library
     files are earlier than the Docker image build date.
 
@@ -76,19 +84,31 @@ def verify_docker_image(verbose: bool = False, print_checked_paths: bool = False
     :param print_checked_paths: If ``True``, prints out paths of all checked files.
     """
     output = run_command(
-        ["docker", "image", "ls", "gcc-custom", "--format", "{{.CreatedAt}}"], return_output=True).captured_output
+        ["docker", "image", "ls", "gcc-custom", "--format", "{{.CreatedAt}}"],
+        return_output=True,
+    ).captured_output
     assert output is not None
     image_creation_time_string = output.decode("utf-8").strip()
-    image_creation_timestamp = datetime.strptime(image_creation_time_string, "%Y-%m-%d %H:%M:%S %z %Z").timestamp()
+    image_creation_timestamp = datetime.strptime(
+        image_creation_time_string, "%Y-%m-%d %H:%M:%S %z %Z"
+    ).timestamp()
 
     repo_root: Path = Path(__file__).parent.parent.parent
-    paths_to_check = ["ghcc", "scripts", ".dockerignore", "Dockerfile", "requirements.txt"]
+    paths_to_check = [
+        "ghcc",
+        "scripts",
+        ".dockerignore",
+        "Dockerfile",
+        "requirements.txt",
+    ]
     paths_to_ignore = ["ghcc/parse", "ghcc/database.py", "scripts/fake_libc_include"]
     prefixes_to_ignore = [str(repo_root / path) for path in paths_to_ignore]
     max_timestamp = 0.0
     for repo_path in paths_to_check:
         path = str(repo_root / repo_path)
-        if os.path.isfile(path) and not any(path.startswith(prefix) for prefix in prefixes_to_ignore):
+        if os.path.isfile(path) and not any(
+            path.startswith(prefix) for prefix in prefixes_to_ignore
+        ):
             if print_checked_paths:
                 print(path)
             max_timestamp = max(max_timestamp, os.path.getmtime(path))
@@ -98,14 +118,22 @@ def verify_docker_image(verbose: bool = False, print_checked_paths: bool = False
                     continue
                 for f in files:
                     file_path = os.path.join(subdir, f)
-                    if not any(file_path.startswith(prefix) for prefix in prefixes_to_ignore):
+                    if not any(
+                        file_path.startswith(prefix) for prefix in prefixes_to_ignore
+                    ):
                         if print_checked_paths:
                             print(file_path)
                         max_timestamp = max(max_timestamp, os.path.getmtime(file_path))
     up_to_date = max_timestamp <= image_creation_timestamp
 
     if not up_to_date and verbose:
-        image_path = os.path.relpath(os.path.join(__file__, "..", "..", ".."), os.getcwd())
-        log("ERROR: Your Docker image is out-of-date. Please rebuild the image by: "
-            f"`docker build -t gcc-custom {image_path}`", "error", force_console=True)
+        image_path = os.path.relpath(
+            os.path.join(__file__, "..", "..", ".."), os.getcwd()
+        )
+        log(
+            "ERROR: Your Docker image is out-of-date. Please rebuild the image by: "
+            f"`docker build -t gcc-custom {image_path}`",
+            "error",
+            force_console=True,
+        )
     return up_to_date

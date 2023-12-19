@@ -25,7 +25,9 @@ __all__ = [
     "preprocess_file",
 ]
 
-FAKE_LIBC_PATH = str((Path(__file__).parent.parent.parent / "scripts" / "fake_libc_include").absolute())
+FAKE_LIBC_PATH = str(
+    (Path(__file__).parent.parent.parent / "scripts" / "fake_libc_include").absolute()
+)
 FAKE_LIBC_END_LINE = "typedef int __end_of_fake_libc__;"
 
 
@@ -89,10 +91,10 @@ class FunctionReplacer(CGenerator):
         is_begin = False
         if line.startswith(self.BOUNDARY_PREFIX):
             if line.endswith(self.BEGIN_SUFFIX):
-                func_name = line[len(self.BOUNDARY_PREFIX):-len(self.BEGIN_SUFFIX)]
+                func_name = line[len(self.BOUNDARY_PREFIX) : -len(self.BEGIN_SUFFIX)]
                 is_begin = True
             if line.endswith(self.END_SUFFIX):
-                func_name = line[len(self.BOUNDARY_PREFIX):-len(self.END_SUFFIX)]
+                func_name = line[len(self.BOUNDARY_PREFIX) : -len(self.END_SUFFIX)]
         if func_name is not None and func_name in self._func_defs:
             return func_name, is_begin
         return None, False
@@ -102,12 +104,22 @@ class PreprocessError(Exception):
     pass
 
 
-LINE_CONTROL_REGEX = re.compile(r'^#[^\n]*$', flags=re.MULTILINE)
+LINE_CONTROL_REGEX = re.compile(r"^#[^\n]*$", flags=re.MULTILINE)
 
 
 def _preprocess(input_path: str, output_path: str) -> str:
     compile_ret = run_command(
-        ["gcc", "-E", "-nostdlib", "-I" + FAKE_LIBC_PATH, "-o", output_path, input_path], ignore_errors=True)
+        [
+            "gcc",
+            "-E",
+            "-nostdlib",
+            "-I" + FAKE_LIBC_PATH,
+            "-o",
+            output_path,
+            input_path,
+        ],
+        ignore_errors=True,
+    )
 
     if compile_ret.return_code != 0:
         if compile_ret.captured_output is not None:
@@ -148,11 +160,12 @@ def preprocess_file(path: str) -> str:
         return _preprocess(path, output_path)
 
 
-PARSE_ERROR_REGEX = re.compile(r'.*?:(?P<line>\d+):(?P<col>\d+): (?P<msg>.+)')
+PARSE_ERROR_REGEX = re.compile(r".*?:(?P<line>\d+):(?P<col>\d+): (?P<msg>.+)")
 
 
-def parse_decompiled_code(code: str, lexer: LexerWrapper, parser: CParser,
-                          max_type_fix_tries: int = 10) -> Tuple[ASTNode, str]:
+def parse_decompiled_code(
+    code: str, lexer: LexerWrapper, parser: CParser, max_type_fix_tries: int = 10
+) -> Tuple[ASTNode, str]:
     r"""Parse preprocessed decompiled code and heuristically fix errors caused by undefined types.
 
     If a parse error is encountered, we attempt to fix the code by parsing the error message and checking whether if
@@ -177,7 +190,9 @@ def parse_decompiled_code(code: str, lexer: LexerWrapper, parser: CParser,
             break
         except pycparser.c_parser.ParseError as e:
             error_match = PARSE_ERROR_REGEX.match(str(e))
-            if error_match is None or not error_match.group("msg").startswith("before: "):
+            if error_match is None or not error_match.group("msg").startswith(
+                "before: "
+            ):
                 raise
             before_token = remove_prefix(error_match.group("msg"), "before: ")
             error_line = code_lines[int(error_match.group("line")) - 1]
@@ -185,29 +200,40 @@ def parse_decompiled_code(code: str, lexer: LexerWrapper, parser: CParser,
             tokens = list(lexer.lex_tokens(error_line))
             try:
                 error_token_idx = next(
-                    idx for idx, token in enumerate(tokens)
-                    if token.lexpos == error_pos and token.value == before_token)
+                    idx
+                    for idx, token in enumerate(tokens)
+                    if token.lexpos == error_pos and token.value == before_token
+                )
                 # There are multiple possible cases here:
                 # 1. The type is the first ID-type token before the reported token (`type token`). It might not
                 #    be the one immediately in front (for example, `(type) token`， `type *token`).
                 # 2. The type is the token itself. This is rare and only happens in a situation like:
                 #      `int func(const token var)`  or  `int func(int a, token b)`
                 #    Replacing `const` with any combination of type qualifiers also works.
-                if (error_token_idx > 0 and
-                        tokens[error_token_idx - 1].type in ["CONST", "VOLATILE", "RESTRICT",
-                                                             "__CONST", "__RESTRICT", "__EXTENSION__",
-                                                             "COMMA"]):
+                if error_token_idx > 0 and tokens[error_token_idx - 1].type in [
+                    "CONST",
+                    "VOLATILE",
+                    "RESTRICT",
+                    "__CONST",
+                    "__RESTRICT",
+                    "__EXTENSION__",
+                    "COMMA",
+                ]:
                     type_token = tokens[error_token_idx]
                 else:
                     type_token = next(
-                        tokens[idx] for idx in range(error_token_idx - 1, -1, -1)
-                        if tokens[idx].type == "ID")
+                        tokens[idx]
+                        for idx in range(error_token_idx - 1, -1, -1)
+                        if tokens[idx].type == "ID"
+                    )
             except StopIteration:
                 # If we don't catch this, it would terminate the for-loop in `main()`. Stupid design.
                 raise e from None
 
             if type_token.value in added_types:
-                raise ValueError(f"Type {type_token.value} already added (types so far: {list(added_types)})")
+                raise ValueError(
+                    f"Type {type_token.value} already added (types so far: {list(added_types)})"
+                )
             added_types.add(type_token.value)
             typedef_line = f"typedef int {type_token.value};"
             code = typedef_line + "\n" + code

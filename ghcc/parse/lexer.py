@@ -29,7 +29,9 @@ class CachedCLexer(CLexer):
     __module__ = CLexer.__module__
     _cached_tokens: List[LexToken]
 
-    def __init__(self, error_func, on_lbrace_func, on_rbrace_func, type_lookup_func) -> None:
+    def __init__(
+        self, error_func, on_lbrace_func, on_rbrace_func, type_lookup_func
+    ) -> None:
         self._cached_tokens = []
         super().__init__(error_func, on_lbrace_func, on_rbrace_func, type_lookup_func)
 
@@ -54,7 +56,9 @@ def convert_to_tokens(code: str, lex_tokens: List[LexToken]) -> List[Token]:
     line_start = [-1] + [i for i, ch in enumerate(code) if ch == "\n"]
     tokens = []
     for tok in lex_tokens:
-        tokens.append(Token(tok.value, tok.lineno, tok.lexpos - line_start[tok.lineno - 1]))
+        tokens.append(
+            Token(tok.value, tok.lineno, tok.lexpos - line_start[tok.lineno - 1])
+        )
     return tokens
 
 
@@ -72,8 +76,10 @@ class LexerWrapper:
         return False
 
     def __init__(self) -> None:
-        self.lexer = CLexer(self._error_func, self._brace_func, self._brace_func, self._type_lookup_func)
-        self.lexer.build(optimize=True, lextab='pycparser.lextab')
+        self.lexer = CLexer(
+            self._error_func, self._brace_func, self._brace_func, self._type_lookup_func
+        )
+        self.lexer.build(optimize=True, lextab="pycparser.lextab")
 
     def lex_tokens(self, code: str) -> Iterator[LexToken]:
         self.lexer.reset_lineno()

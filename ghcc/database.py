@@ -55,23 +55,32 @@ class Database(abc.ABC):
         return []
 
     def __init__(self, config_file: str = "./database-config.json", **override_config):
-        r"""Create a connection to the database.
-        """
+        r"""Create a connection to the database."""
         if not os.path.exists(config_file):
-            raise ValueError(f"DB config file not found at '{config_file}'. "
-                             f"Please refer to 'database-config-example.json' for the format")
+            raise ValueError(
+                f"DB config file not found at '{config_file}'. "
+                f"Please refer to 'database-config-example.json' for the format"
+            )
         with open(config_file) as f:
             config: Database.Config = json.load(f)
         config.update(override_config)
-        missing_keys = [key for key in Database.Config.__annotations__ if key not in config]
+        missing_keys = [
+            key for key in Database.Config.__annotations__ if key not in config
+        ]
         if len(missing_keys) > 0:
-            raise ValueError(f"Keys {missing_keys} are missing from the DB config file at '{config_file}'.from "
-                             f"Please refer to 'database-config-example.json' for the format")
+            raise ValueError(
+                f"Keys {missing_keys} are missing from the DB config file at '{config_file}'.from "
+                f"Please refer to 'database-config-example.json' for the format"
+            )
 
         self.client = pymongo.MongoClient(
-            config['host'], port=config['port'], authSource=config['auth_db_name'],
-            username=config['username'], password=config['password'])
-        self.collection = self.client[config['db_name']][self.collection_name]
+            config["host"],
+            port=config["port"],
+            authSource=config["auth_db_name"],
+            username=config["username"],
+            password=config["password"],
+        )
+        self.collection = self.client[config["db_name"]][self.collection_name]
 
         for new_index in self.index:
             new_index = new_index.copy()
@@ -81,11 +90,18 @@ class Database(abc.ABC):
                 del new_index["$unique"]
             for key in new_index:
                 if key not in self.Entry.__annotations__:
-                    raise ValueError(f"Index contains key '{key}', which is not in Entry definition")
-            if not any(index["key"].to_dict() == new_index for index in self.collection.list_indexes()):
+                    raise ValueError(
+                        f"Index contains key '{key}', which is not in Entry definition"
+                    )
+            if not any(
+                index["key"].to_dict() == new_index
+                for index in self.collection.list_indexes()
+            ):
                 # Only create index if no such index exists.
                 # This check is required because `create_index` seems not idempotent, although it should be.
-                self.collection.create_index(list(new_index.items()), unique=unique, background=True)
+                self.collection.create_index(
+                    list(new_index.items()), unique=unique, background=True
+                )
 
     def count(self, estimate: bool = True) -> int:
         if estimate:
@@ -96,7 +112,7 @@ class Database(abc.ABC):
         del self.collection
         self.client.close()
 
-    def safe_iter(self, batch_size: int = 1000, static: bool = False) -> Iterator['Entry']:  # type: ignore
+    def safe_iter(self, batch_size: int = 1000, static: bool = False) -> Iterator["Entry"]:  # type: ignore
         r"""Safely iterate over all documents. The normal way (``for entry in collection.find()``) result in cursor
         timeout if the iteration takes too long, and it's unavoidable unless configured on the server.
 
@@ -113,8 +129,10 @@ class Database(abc.ABC):
         """
         # Find a unique index.
         if all(not index.get("$unique", True) for index in self.index):
-            raise ValueError(f"`safe_iter` does not work for database {self.__class__.__name__} because there are no "
-                             f"unique indexes.")
+            raise ValueError(
+                f"`safe_iter` does not work for database {self.__class__.__name__} because there are no "
+                f"unique indexes."
+            )
         index = next(index for index in self.index if index.get("$unique", True))
         if "$unique" in index:
             del index["$unique"]
@@ -122,7 +140,12 @@ class Database(abc.ABC):
         yielded_ids: Set[Any] = set()
         prev_index = 0
         while True:
-            cursor = self.collection.find().sort(list(index.items())).skip(prev_index).limit(batch_size)
+            cursor = (
+                self.collection.find()
+                .sort(list(index.items()))
+                .skip(prev_index)
+                .limit(batch_size)
+            )
             if static:
                 entries = list(cursor)
             else:
@@ -138,8 +161,7 @@ class Database(abc.ABC):
 
 
 class RepoDB(Database):
-    r"""An abstraction over MongoDB that stores information about repositories.
-    """
+    r"""An abstraction over MongoDB that stores information about repositories."""
 
     class MakefileEntry(BaseEntry):
         directory: str  # directory containing the Makefile
@@ -151,14 +173,14 @@ class RepoDB(Database):
         repo_owner: str
         repo_name: str
         repo_size: int  # size of the repo in bytes
-        repo_branch: str # name of the branch the repo is cloning from (default is master)
-        repo_commit_id: str # commit id for a branch (can be none)
-        repo_tag: str # tag to build from (can be none)
+        repo_branch: str  # name of the branch the repo is cloning from (default is master)
+        repo_commit_id: str  # commit id for a branch (can be none)
+        repo_tag: str  # tag to build from (can be none)
         clone_successful: bool  # whether the repo has been successfully cloned to the server
         compiled: bool  # whether the repo has been tested for compilation
         num_makefiles: int  # number of compilable Makefiles (required because MongoDB cannot aggregate list lengths)
         num_binaries: int  # number of generated binaries (required because MongoDB cannot aggregate list lengths)
-        makefiles: 'List[RepoDB.MakefileEntry]'  # list of Makefiles
+        makefiles: "List[RepoDB.MakefileEntry]"  # list of Makefiles
 
     @property
     def collection_name(self) -> str:
@@ -166,19 +188,32 @@ class RepoDB(Database):
 
     @property
     def index(self) -> List[Index]:
-        return [{
-            "repo_owner": pymongo.ASCENDING,
-            "repo_name": pymongo.ASCENDING,
-        }]
+        return [
+            {
+                "repo_owner": pymongo.ASCENDING,
+                "repo_name": pymongo.ASCENDING,
+            }
+        ]
 
     def get(self, repo_owner: str, repo_name: str) -> Optional[Entry]:
         r"""Get the DB entry corresponding to the specified repository.
 
         :return: If entry exists, it is returned as a dictionary; otherwise ``None`` is returned.
         """
-        return self.collection.find_one({"repo_owner": repo_owner, "repo_name": repo_name})
+        return self.collection.find_one(
+            {"repo_owner": repo_owner, "repo_name": repo_name}
+        )
 
-    def add_repo(self, repo_owner: str, repo_name: str, repo_branch: str, repo_commit_id: str, repo_tag: str, clone_successful: bool, repo_size: int = -1) -> None:
+    def add_repo(
+        self,
+        repo_owner: str,
+        repo_name: str,
+        repo_branch: str,
+        repo_commit_id: str,
+        repo_tag: str,
+        clone_successful: bool,
+        repo_size: int = -1,
+    ) -> None:
         r"""Add a new DB entry for the specified repository. Arguments correspond to the first three fields in
         :class:`RepoEntry`. Other fields are set to sensible default values (``False`` and ``[]``).
 
@@ -207,13 +242,23 @@ class RepoDB(Database):
             }
             self.collection.insert_one(record)
         else:
-            self.collection.update_one({"_id": record["_id"]}, {"$set": {
-                "clone_successful": clone_successful,
-                "repo_size": repo_size,
-            }})
+            self.collection.update_one(
+                {"_id": record["_id"]},
+                {
+                    "$set": {
+                        "clone_successful": clone_successful,
+                        "repo_size": repo_size,
+                    }
+                },
+            )
 
-    def update_makefile(self, repo_owner: str, repo_name: str, makefiles: List[MakefileEntry],
-                        ignore_length_mismatch: bool = False) -> bool:
+    def update_makefile(
+        self,
+        repo_owner: str,
+        repo_name: str,
+        makefiles: List[MakefileEntry],
+        ignore_length_mismatch: bool = False,
+    ) -> bool:
         r"""Update Makefile compilation results for a given repository.
 
         :param repo_owner: Owner of the repository.
@@ -227,10 +272,17 @@ class RepoDB(Database):
         """
         entry = self.get(repo_owner, repo_name)
         if entry is None:
-            raise ValueError(f"Specified repository {repo_owner}/{repo_name} does not exist")
-        if not ignore_length_mismatch and len(entry["makefiles"]) not in [0, len(makefiles)]:
-            raise ValueError(f"Number of makefiles stored in entry of {repo_owner}/{repo_name} "
-                             f"({len(entry['makefiles'])}) does not match provided list ({len(makefiles)})")
+            raise ValueError(
+                f"Specified repository {repo_owner}/{repo_name} does not exist"
+            )
+        if not ignore_length_mismatch and len(entry["makefiles"]) not in [
+            0,
+            len(makefiles),
+        ]:
+            raise ValueError(
+                f"Number of makefiles stored in entry of {repo_owner}/{repo_name} "
+                f"({len(entry['makefiles'])}) does not match provided list ({len(makefiles)})"
+            )
         update_entries = {
             "compiled": True,
             "num_makefiles": len(makefiles),
@@ -238,19 +290,28 @@ class RepoDB(Database):
             "makefiles": makefiles,
         }
         try:
-            result = self.collection.update_one({"_id": entry["_id"]}, {"$set": update_entries})
+            result = self.collection.update_one(
+                {"_id": entry["_id"]}, {"$set": update_entries}
+            )
             assert result.matched_count == 1
             return True
         except UnicodeEncodeError as e:
-            update_entries["makefiles"] = []  # some path might contain strange characters; just don't store it
-            result = self.collection.update_one({"_id": entry["_id"]}, {"$set": update_entries})
+            update_entries[
+                "makefiles"
+            ] = []  # some path might contain strange characters; just don't store it
+            result = self.collection.update_one(
+                {"_id": entry["_id"]}, {"$set": update_entries}
+            )
             assert result.matched_count == 1
             return False
 
     def _aggregate_sum(self, field_name: str) -> int:
         cursor = self.collection.aggregate(
-            [{"$match": {"compiled": True}},
-             {"$group": {"_id": None, "total": {"$sum": f"${field_name}"}}}])
+            [
+                {"$match": {"compiled": True}},
+                {"$group": {"_id": None, "total": {"$sum": f"${field_name}"}}},
+            ]
+        )
         return next(cursor)["total"]
 
     def count_makefiles(self) -> int:
@@ -274,9 +335,11 @@ class BinaryDB(Database):
     @property
     def index(self) -> List[Index]:
         return [
-            {"repo_owner": pymongo.ASCENDING,
-             "repo_name": pymongo.ASCENDING,
-             "$unique": False},
+            {
+                "repo_owner": pymongo.ASCENDING,
+                "repo_name": pymongo.ASCENDING,
+                "$unique": False,
+            },
             {"sha": pymongo.ASCENDING},
         ]
 
@@ -287,7 +350,9 @@ class BinaryDB(Database):
         """
         return self.collection.find_one({"sha": sha})
 
-    def get_binaries_by_repo(self, repo_owner: str, repo_name: str, success: bool = True) -> Iterator[Entry]:
+    def get_binaries_by_repo(
+        self, repo_owner: str, repo_name: str, success: bool = True
+    ) -> Iterator[Entry]:
         r"""Get all matching DB entries given a repository.
 
         :param repo_owner: Owner of the repository.
@@ -295,9 +360,13 @@ class BinaryDB(Database):
         :param success: The decompilation status of the binary.
         :return: An iterator (``pymongo.Cursor``) over matching entries.
         """
-        return self.collection.find({"repo_owner": repo_owner, "repo_name": repo_name, "success": success})
+        return self.collection.find(
+            {"repo_owner": repo_owner, "repo_name": repo_name, "success": success}
+        )
 
-    def add_binary(self, repo_owner: str, repo_name: str, sha: str, success: bool) -> None:
+    def add_binary(
+        self, repo_owner: str, repo_name: str, sha: str, success: bool
+    ) -> None:
         r"""Add a new DB entry for the specified binary.
 
         :param repo_owner: Owner of the repository.
@@ -315,9 +384,14 @@ class BinaryDB(Database):
             }
             self.collection.insert_one(record)
         else:
-            self.collection.update_one({"_id": record["_id"]}, {"$set": {
-                "success": success,
-            }})
+            self.collection.update_one(
+                {"_id": record["_id"]},
+                {
+                    "$set": {
+                        "success": success,
+                    }
+                },
+            )
 
 
 class MatchFuncDB(Database):
@@ -335,20 +409,31 @@ class MatchFuncDB(Database):
 
     @property
     def index(self) -> List[Index]:
-        return [{
-            "repo_owner": pymongo.ASCENDING,
-            "repo_name": pymongo.ASCENDING,
-        }]
+        return [
+            {
+                "repo_owner": pymongo.ASCENDING,
+                "repo_name": pymongo.ASCENDING,
+            }
+        ]
 
     def get(self, repo_owner: str, repo_name: str) -> Optional[Entry]:
         r"""Get the DB entry corresponding to the specified repository.
 
         :return: If entry exists, it is returned as a dictionary; otherwise ``None`` is returned.
         """
-        return self.collection.find_one({"repo_owner": repo_owner, "repo_name": repo_name})
+        return self.collection.find_one(
+            {"repo_owner": repo_owner, "repo_name": repo_name}
+        )
 
-    def add_repo(self, repo_owner: str, repo_name: str,
-                 files_found: int, funcs_found: int, funcs_matched: int, funcs_matched_without_ast: int) -> None:
+    def add_repo(
+        self,
+        repo_owner: str,
+        repo_name: str,
+        files_found: int,
+        funcs_found: int,
+        funcs_matched: int,
+        funcs_matched_without_ast: int,
+    ) -> None:
         r"""Add a new DB entry for the specified repository."""
         record = self.get(repo_owner, repo_name)
         if record is None:
@@ -362,18 +447,25 @@ class MatchFuncDB(Database):
             }
             self.collection.insert_one(record)
         else:
-            self.collection.update_one({"_id": record["_id"]}, {"$set": {
-                "files_found": files_found,
-                "funcs_found": funcs_found,
-                "funcs_matched": funcs_matched,
-                "funcs_matched_without_ast": funcs_matched_without_ast,
-            }})
+            self.collection.update_one(
+                {"_id": record["_id"]},
+                {
+                    "$set": {
+                        "files_found": files_found,
+                        "funcs_found": funcs_found,
+                        "funcs_matched": funcs_matched,
+                        "funcs_matched_without_ast": funcs_matched_without_ast,
+                    }
+                },
+            )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     db = RepoDB()
     if len(sys.argv) > 1 and sys.argv[1] == "clear":
-        confirm = input("This will drop the entire repository database. Confirm? [y/N] ")
+        confirm = input(
+            "This will drop the entire repository database. Confirm? [y/N] "
+        )
         if confirm.lower() in ["y", "yes"]:
             db.collection.delete_many({})
             db.close()
@@ -381,8 +473,9 @@ if __name__ == '__main__':
         else:
             print("Operation cancelled.")
     else:
-        print("Interact with the database using `db`, e.g.:\n"
-              "> db.count_makefiles()\n")
+        print(
+            "Interact with the database using `db`, e.g.:\n" "> db.count_makefiles()\n"
+        )
         from IPython import embed
 
         embed()

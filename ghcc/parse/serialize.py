@@ -23,15 +23,17 @@ __all__ = [
     "TOKEN_POS_ATTR",
 ]
 
-T = TypeVar('T')
-K = TypeVar('K')
+T = TypeVar("T")
+K = TypeVar("K")
 MaybeList = Union[T, List[T]]
 JSONNode = Dict[str, Any]
 
-RE_CHILD_ARRAY = re.compile(r'(.*)\[(.*)\]')
-RE_INTERNAL_ATTR = re.compile('__.*__')
+RE_CHILD_ARRAY = re.compile(r"(.*)\[(.*)\]")
+RE_INTERNAL_ATTR = re.compile("__.*__")
 
-AVAILABLE_NODES: Dict[str, Type[ASTNode]] = {klass.__name__: klass for klass in ASTNode.__subclasses__()}
+AVAILABLE_NODES: Dict[str, Type[ASTNode]] = {
+    klass.__name__: klass for klass in ASTNode.__subclasses__()
+}
 NODE_TYPE_ATTR = "_t"
 CHILDREN_ATTR = "_c"
 TOKEN_POS_ATTR = "_p"
@@ -99,7 +101,9 @@ def ast_to_dict(root: ASTNode, tokens: Optional[List[Token]] = None) -> JSONNode
 
         # Token position
         if tokens is not None:
-            if node.coord is not None and node.coord.line > 0:  # some nodes have invalid coordinate (0, 1)
+            if (
+                node.coord is not None and node.coord.line > 0
+            ):  # some nodes have invalid coordinate (0, 1)
                 coord: Coord = node.coord
                 pos = find_token(coord.line, coord.column)
                 result[TOKEN_POS_ATTR] = pos
@@ -126,8 +130,10 @@ def ast_to_dict(root: ASTNode, tokens: Optional[List[Token]] = None) -> JSONNode
                 # arrays come in order, so we verify and append.
                 array: List[JSONNode] = children.setdefault(array_name, [])  # type: ignore
                 if array_index != len(array):
-                    raise ValueError(f"Internal ast error. Array {array_name} out of order. "
-                                     f"Expected index {len(array)}, got {array_index}")
+                    raise ValueError(
+                        f"Internal ast error. Array {array_name} out of order. "
+                        f"Expected index {len(array)}, got {array_index}"
+                    )
                 array.append(child_dict)
             else:
                 children[child_name] = child_dict
@@ -159,13 +165,12 @@ def get_ast_class(name: str) -> Type[ASTNode]:
 
 
 def dict_to_ast(node_dict: JSONNode) -> ASTNode:
-    r"""Recursively build an AST from dictionary representation. Coordinate information is discarded.
-    """
+    r"""Recursively build an AST from dictionary representation. Coordinate information is discarded."""
     class_name = node_dict[NODE_TYPE_ATTR]
     klass = get_ast_class(class_name)
 
     # Create a new dict containing the key-value pairs which we can pass to node constructors.
-    kwargs: Dict[str, Any] = {'coord': None}
+    kwargs: Dict[str, Any] = {"coord": None}
     children: Dict[str, MaybeList[JSONNode]] = node_dict[CHILDREN_ATTR]
     for name, child in children.items():
         if isinstance(child, list):
