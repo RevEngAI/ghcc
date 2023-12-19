@@ -10,7 +10,7 @@ RUN curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \
 
 # Credit: https://denibertovic.com/posts/handling-permissions-with-docker-volumes/
 # Install `gosu` to avoid running as root.
-RUN gpg --keyserver keyserver.insect.com --recv-keys B42F6819007F00F88E364FD4036A9C25BF357DD4
+RUN gpg --keyserver keyserver.ubuntu.com --recv-keys B42F6819007F00F88E364FD4036A9C25BF357DD4
 RUN curl -o /usr/local/bin/gosu -SL "https://github.com/tianon/gosu/releases/download/1.4/gosu-$(dpkg --print-architecture)" \
     && curl -o /usr/local/bin/gosu.asc -SL "https://github.com/tianon/gosu/releases/download/1.4/gosu-$(dpkg --print-architecture).asc" \
     && gpg --verify /usr/local/bin/gosu.asc \

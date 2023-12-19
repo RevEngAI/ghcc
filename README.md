@@ -10,6 +10,37 @@ adapted from [CMUSTRUDEL/DIRE](https://github.com/CMUSTRUDEL/DIRE).
 
 ## Setup
 
+### Quickstart
+
+You can use `setup_system.sh` to setup an ubuntu machine to run this project
+
+```sh
+git clone https://github.com/mov0xdecafe/ghcc.git
+cd ghcc
+./scripts/system_setup.sh
+```
+
+> This script assumes you are running in the ghcc folder, calling this from any other directory will result in an error.
+
+#### database-config.json
+
+You can then replace the contents of the `database-config.json` file to the values below:
+
+```json
+{
+  "host": "localhost",
+  "port": 27017,
+  "auth_db_name": "admin",
+  "db_name": "ghcc",
+  "username": "gchh_crawler",
+  "password": "securepassword"
+}
+```
+
+These are based on the values used in the mongodb setup in `scripts/system_setup.sh`
+
+### Full setup
+
 1. Install [Docker](https://docs.docker.com/install/) and [MongoDB](https://docs.mongodb.com/manual/installation/).
 2. Install required Python packages by:
    ```bash
@@ -211,3 +242,28 @@ describe what is done to (partly) ensure safety of the host machine when compili
    distinct UID, and call `ulimit` for that user. This serves as a workaround for per-container limits.
    
    Don't forget to `chmod g+w` for files that need to be accessed from host.
+
+## URL Files
+
+### JSON
+
+If you have specific requirements for the branch, commit_id, or tag for a repo, you should use a .json URL file
+
+```json
+{
+    "repos": [
+        {
+            "url": "https:github.com/example/test.git",
+            "branch": "master",
+            "commit": "123456789abcdef",
+            "tag": "v0.1"
+        }
+    ]
+}
+```
+
+## TODO's
+
+- [ ] Ability to checkout certain commits for compilation
+- [ ] Compiler matrix for different versions and configurations
+  - [ ] Enumerate over all tags
