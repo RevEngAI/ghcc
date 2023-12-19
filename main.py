@@ -282,7 +282,16 @@ def clone_and_compile(
             pass
 
         # Stage 3: Compile each Makefile.
+        # generate the binary path based on the provided repo name, tag used, commit_id, and repo_branch
+        # dir is in form $BIN_DIR/$FULL_REPO_NAME/TAG/COMMIT_ID/BRANCH/
         repo_binary_dir = os.path.join(binary_folder, repo_full_name)
+        if repo_info.repo_tag is not None:
+            repo_binary_dir = os.path.join(repo_binary_dir, repo_info.repo_tag)
+        if repo_info.repo_branch is not None:
+            repo_binary_dir = os.path.join(repo_binary_dir, repo_info.repo_branch)
+        if repo_info.repo_commit_id is not None:
+            repo_binary_dir = os.path.join(repo_binary_dir, repo_info.repo_commit_id)
+
         if not os.path.exists(repo_binary_dir):
             os.makedirs(repo_binary_dir)
         flutes.log(f"Starting compilation for {repo_full_name}...")
@@ -409,9 +418,9 @@ def iter_repos(
                     index,
                     repo_owner,
                     repo_name,
-                    repo["branch"],
-                    repo["commit"],
-                    repo["tag"],
+                    repo.get("branch", None),
+                    repo.get("commit", None),
+                    repo.get("tag", None),
                     db_result,
                 )
                 index += 1
