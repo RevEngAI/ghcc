@@ -36,14 +36,22 @@ class Arguments(argtyped.Arguments):
     force_recompile: Switch = False
     docker_batch_compile: Switch = True
     compression_type: Choices["gzip", "xz"] = "gzip"
-    max_archive_size: Optional[int] = 100 * 1024 * 1024  # only archive repos no larger than 100MB.
-    record_libraries: Optional[str] = None  # gather libraries used in Makefiles and print to the specified file
+    max_archive_size: Optional[int] = (
+        100 * 1024 * 1024
+    )  # only archive repos no larger than 100MB.
+    record_libraries: Optional[
+        str
+    ] = None  # gather libraries used in Makefiles and print to the specified file
     logging_level: Choices[flutes.get_logging_levels()] = "info"
-    max_repos: Optional[int] = None  # maximum number of repositories to process (ignoring non-existent)
+    max_repos: Optional[
+        int
+    ] = None  # maximum number of repositories to process (ignoring non-existent)
     recursive_clone: Switch = True  # if True, use `--recursive` when `git clone`
     write_db: Switch = True  # only modify the DB when True
     record_metainfo: Switch = False  # if True, record a bunch of other stuff
-    gcc_override_flags: Optional[str] = None  # GCC flags to use during compilation, e.g. "-O2 -march=x86-64"
+    gcc_override_flags: Optional[
+        str
+    ] = None  # GCC flags to use during compilation, e.g. "-O2 -march=x86-64"
 
 
 class RepoInfo(NamedTuple):
@@ -81,26 +89,39 @@ def contains_in_file(file_path: str, text: str) -> bool:
     """
     if not os.path.exists(file_path):
         return False
-    with open(file_path, 'r') as f:
+    with open(file_path, "r") as f:
         line = f.readline()
     return text in line
 
 
 def exception_handler(e, repo_info: RepoInfo, _return: bool = False):
-    flutes.log_exception(e, f"Exception occurred when processing {repo_info.repo_owner}/{repo_info.repo_name}")
+    flutes.log_exception(
+        e,
+        f"Exception occurred when processing {repo_info.repo_owner}/{repo_info.repo_name}",
+    )
     if _return:
         # mark it as "failed to clone" so we don't deal with it anymore
         return PipelineResult(repo_info, clone_success=False)
 
 
 @flutes.exception_wrapper(exception_handler)
-def clone_and_compile(repo_info: RepoInfo, clone_folder: str, binary_folder: str, archive_folder: str,
-                      recursive_clone: bool = True,
-                      clone_timeout: Optional[float] = None, compile_timeout: Optional[float] = None,
-                      force_reclone: bool = False, force_recompile: bool = False, docker_batch_compile: bool = True,
-                      max_archive_size: Optional[int] = None, compression_type: str = "gzip",
-                      record_libraries: bool = False, record_metainfo: bool = False,
-                      gcc_override_flags: Optional[str] = None) -> PipelineResult:
+def clone_and_compile(
+    repo_info: RepoInfo,
+    clone_folder: str,
+    binary_folder: str,
+    archive_folder: str,
+    recursive_clone: bool = True,
+    clone_timeout: Optional[float] = None,
+    compile_timeout: Optional[float] = None,
+    force_reclone: bool = False,
+    force_recompile: bool = False,
+    docker_batch_compile: bool = True,
+    max_archive_size: Optional[int] = None,
+    compression_type: str = "gzip",
+    record_libraries: bool = False,
+    record_metainfo: bool = False,
+    gcc_override_flags: Optional[str] = None,
+) -> PipelineResult:
     r"""Perform the entire pipeline.
 
     :param repo_info: Information about the repository.
@@ -141,41 +162,66 @@ def clone_and_compile(repo_info: RepoInfo, clone_folder: str, binary_folder: str
         tar_type_flag = "z"
     else:
         raise ValueError(f"Invalid compression type '{compression_type}'")
-    archive_path = os.path.abspath(os.path.join(archive_folder, f"{repo_full_name}{archive_extension}"))
+    archive_path = os.path.abspath(
+        os.path.join(archive_folder, f"{repo_full_name}{archive_extension}")
+    )
 
     repo_entry = repo_info.db_result
     clone_success = None
 
     # Skip repos that are fully processed
-    if (repo_entry is not None and
-            (repo_entry["clone_successful"] and not force_reclone) and
-            (repo_entry["compiled"] and not force_recompile)):
+    if (
+        repo_entry is not None
+        and (repo_entry["clone_successful"] and not force_reclone)
+        and (repo_entry["compiled"] and not force_recompile)
+    ):
         return PipelineResult(repo_info)
 
     # Stage 1: Cloning from GitHub.
     if not force_reclone and os.path.exists(archive_path):
         # Extract the archive instead of cloning.
         try:
-            flutes.run_command(["tar", f"x{tar_type_flag}f", archive_path], timeout=clone_timeout, cwd=clone_folder)
+            flutes.run_command(
+                ["tar", f"x{tar_type_flag}f", archive_path],
+                timeout=clone_timeout,
+                cwd=clone_folder,
+            )
             flutes.log(f"{repo_full_name} extracted from archive", "success")
         except (subprocess.TimeoutExpired, subprocess.CalledProcessError) as e:
-            flutes.log(f"Unknown error when extracting {repo_full_name}. Captured output: '{e.output}'", "error")
+            flutes.log(
+                f"Unknown error when extracting {repo_full_name}. Captured output: '{e.output}'",
+                "error",
+            )
             shutil.rmtree(repo_path)
             return PipelineResult(repo_info)  # return dummy info
         repo_size = flutes.get_folder_size(repo_path)
-    elif (repo_entry is None or  # not processed
-          force_reclone or
-          (repo_entry["clone_successful"] and  # not compiled
-           (not repo_entry["compiled"] or force_recompile) and not os.path.exists(repo_path))):
+    elif (
+        repo_entry is None
+        or force_reclone  # not processed
+        or (
+            repo_entry["clone_successful"]
+            and (not repo_entry["compiled"] or force_recompile)  # not compiled
+            and not os.path.exists(repo_path)
+        )
+    ):
         clone_result = ghcc.clone(
-            repo_info.repo_owner, repo_info.repo_name, clone_folder=clone_folder, folder_name=repo_folder_name,
-            timeout=clone_timeout, skip_if_exists=False, recursive=recursive_clone)
+            repo_info.repo_owner,
+            repo_info.repo_name,
+            clone_folder=clone_folder,
+            folder_name=repo_folder_name,
+            timeout=clone_timeout,
+            skip_if_exists=False,
+            recursive=recursive_clone,
+        )
         clone_success = clone_result.success
         if not clone_result.success:
             if clone_result.error_type is CloneErrorType.FolderExists:
                 flutes.log(f"{repo_full_name} skipped because folder exists", "warning")
             elif clone_result.error_type is CloneErrorType.PrivateOrNonexistent:
-                flutes.log(f"Failed to clone {repo_full_name} because repository is private or nonexistent", "warning")
+                flutes.log(
+                    f"Failed to clone {repo_full_name} because repository is private or nonexistent",
+                    "warning",
+                )
             else:
                 if clone_result.error_type is CloneErrorType.Unknown:
                     msg = f"Failed to clone {repo_full_name} with unknown error"
@@ -197,8 +243,11 @@ def clone_and_compile(repo_info: RepoInfo, clone_folder: str, binary_folder: str
             flutes.log(msg, "warning")
 
         repo_size = flutes.get_folder_size(repo_path)
-        flutes.log(f"{repo_full_name} successfully cloned ({clone_result.time:.2f}s, "
-                   f"{flutes.readable_size(repo_size)})", "success")
+        flutes.log(
+            f"{repo_full_name} successfully cloned ({clone_result.time:.2f}s, "
+            f"{flutes.readable_size(repo_size)})",
+            "success",
+        )
     else:
         if not repo_entry["clone_successful"]:
             return PipelineResult(repo_info)  # return dummy info
@@ -225,7 +274,9 @@ def clone_and_compile(repo_info: RepoInfo, clone_folder: str, binary_folder: str
         if len(makefile_dirs) == 0:
             # Repo has no Makefiles, delete.
             shutil.rmtree(repo_path)
-            flutes.log(f"No Makefiles found in {repo_full_name}, repository deleted", "warning")
+            flutes.log(
+                f"No Makefiles found in {repo_full_name}, repository deleted", "warning"
+            )
             return PipelineResult(repo_info, clone_success=clone_success, makefiles=[])
         else:
             pass
@@ -238,12 +289,27 @@ def clone_and_compile(repo_info: RepoInfo, clone_folder: str, binary_folder: str
 
         if docker_batch_compile:
             makefiles = ghcc.docker_batch_compile(
-                repo_binary_dir, repo_path, compile_timeout, record_libraries, gcc_override_flags,
+                repo_binary_dir,
+                repo_path,
+                compile_timeout,
+                record_libraries,
+                gcc_override_flags,
                 user_id=(repo_info.idx % 10000) + 30000,  # user IDs 30000 ~ 39999
-                exception_log_fn=functools.partial(exception_handler, repo_info=repo_info))
+                exception_log_fn=functools.partial(
+                    exception_handler, repo_info=repo_info
+                ),
+            )
         else:
-            makefiles = list(ghcc.compile_and_move(
-                repo_binary_dir, repo_path, makefile_dirs, compile_timeout, record_libraries, gcc_override_flags))
+            makefiles = list(
+                ghcc.compile_and_move(
+                    repo_binary_dir,
+                    repo_path,
+                    makefile_dirs,
+                    compile_timeout,
+                    record_libraries,
+                    gcc_override_flags,
+                )
+            )
         num_succeeded = sum(makefile["success"] for makefile in makefiles)
         if record_libraries:
             library_log_path = os.path.join(repo_binary_dir, "libraries.txt")
@@ -254,46 +320,73 @@ def clone_and_compile(repo_info: RepoInfo, clone_folder: str, binary_folder: str
                 libraries = []
         num_binaries = sum(len(makefile["binaries"]) for makefile in makefiles)
 
-        msg = f"{num_succeeded} ({len(makefiles)}) out of {len(makefile_dirs)} Makefile(s) " \
-              f"in {repo_full_name} compiled (partially), yielding {num_binaries} binaries"
+        msg = (
+            f"{num_succeeded} ({len(makefiles)}) out of {len(makefile_dirs)} Makefile(s) "
+            f"in {repo_full_name} compiled (partially), yielding {num_binaries} binaries"
+        )
         flutes.log(msg, "success" if num_succeeded == len(makefile_dirs) else "warning")
 
         if record_metainfo:
-            meta_info = PipelineMetaInfo({
-                "num_makefiles": len(makefile_dirs),
-                "has_gitmodules": os.path.exists(os.path.join(repo_path, ".gitmodules")),
-                "makefiles_using_automake": sum(
-                    ghcc.contains_files(directory, ["configure.ac", "configure.in"]) for directory in makefile_dirs)
-            })
+            meta_info = PipelineMetaInfo(
+                {
+                    "num_makefiles": len(makefile_dirs),
+                    "has_gitmodules": os.path.exists(
+                        os.path.join(repo_path, ".gitmodules")
+                    ),
+                    "makefiles_using_automake": sum(
+                        ghcc.contains_files(directory, ["configure.ac", "configure.in"])
+                        for directory in makefile_dirs
+                    ),
+                }
+            )
 
         # Stage 4: Clean and zip repo.
         if max_archive_size is not None and repo_size > max_archive_size:
             shutil.rmtree(repo_path)
-            flutes.log(f"Removed {repo_full_name} because repository size ({flutes.readable_size(repo_size)}) "
-                       f"exceeds limits", "info")
+            flutes.log(
+                f"Removed {repo_full_name} because repository size ({flutes.readable_size(repo_size)}) "
+                f"exceeds limits",
+                "info",
+            )
         else:
             # Repository is already cleaned in the compile stage.
             os.makedirs(os.path.split(archive_path)[0], exist_ok=True)
             compress_success = False
             try:
-                flutes.run_command(["tar", f"c{tar_type_flag}f", archive_path, repo_folder_name],
-                                   timeout=clone_timeout, cwd=clone_folder)
+                flutes.run_command(
+                    ["tar", f"c{tar_type_flag}f", archive_path, repo_folder_name],
+                    timeout=clone_timeout,
+                    cwd=clone_folder,
+                )
                 compress_success = True
             except subprocess.TimeoutExpired:
-                flutes.log(f"Compression timeout for {repo_full_name}, giving up", "error")
+                flutes.log(
+                    f"Compression timeout for {repo_full_name}, giving up", "error"
+                )
             except subprocess.CalledProcessError as e:
-                flutes.log(f"Unknown error when compressing {repo_full_name}. Captured output: '{e.output}'", "error")
+                flutes.log(
+                    f"Unknown error when compressing {repo_full_name}. Captured output: '{e.output}'",
+                    "error",
+                )
             shutil.rmtree(repo_path)
             if compress_success:
                 flutes.log(f"Compressed {repo_full_name}, folder removed", "info")
             elif os.path.exists(archive_path):
                 os.remove(archive_path)
 
-    return PipelineResult(repo_info, clone_success=clone_success, repo_size=repo_size,
-                          makefiles=makefiles, libraries=libraries, meta_info=meta_info)
+    return PipelineResult(
+        repo_info,
+        clone_success=clone_success,
+        repo_size=repo_size,
+        makefiles=makefiles,
+        libraries=libraries,
+        meta_info=meta_info,
+    )
 
 
-def iter_repos(db: ghcc.RepoDB, repo_list_path: str, max_count: Optional[int] = None) -> Iterator[RepoInfo]:
+def iter_repos(
+    db: ghcc.RepoDB, repo_list_path: str, max_count: Optional[int] = None
+) -> Iterator[RepoInfo]:
     db_entries = {
         (entry["repo_owner"], entry["repo_name"]): entry
         for entry in db.collection.find()  # getting stuff in batch is much faster
@@ -307,12 +400,20 @@ def iter_repos(db: ghcc.RepoDB, repo_list_path: str, max_count: Optional[int] = 
             for repo in j_data["repos"]:
                 url = repo["url"]
                 if url.endswith(".git"):
-                    url = url[:-len(".git")]
+                    url = url[: -len(".git")]
                 repo_owner, repo_name = url.split("/")[-2:]
                 # db_result = db.get(repo_owner, repo_name)
                 db_result = db_entries.get((repo_owner, repo_name), None)
                 # when reading from a .txt file, we only have a URL, no branch, commit_id, or tag info
-                yield RepoInfo(index, repo_owner, repo_name, repo["branch"], repo["commit"], repo["tag"], db_result)
+                yield RepoInfo(
+                    index,
+                    repo_owner,
+                    repo_name,
+                    repo["branch"],
+                    repo["commit"],
+                    repo["tag"],
+                    db_result,
+                )
                 index += 1
                 if max_count is not None and index >= max_count:
                     break
@@ -322,18 +423,19 @@ def iter_repos(db: ghcc.RepoDB, repo_list_path: str, max_count: Optional[int] = 
                     continue
                 url = line.strip().rstrip("/")
                 if url.endswith(".git"):
-                    url = url[:-len(".git")]
+                    url = url[: -len(".git")]
                 repo_owner, repo_name = url.split("/")[-2:]
                 # db_result = db.get(repo_owner, repo_name)
                 db_result = db_entries.get((repo_owner, repo_name), None)
                 # when reading from a .txt file, we only have a URL, no branch, commit_id, or tag info
-                yield RepoInfo(index, repo_owner, repo_name, None, None, None, db_result)
+                yield RepoInfo(
+                    index, repo_owner, repo_name, None, None, None, db_result
+                )
                 index += 1
                 if max_count is not None and index >= max_count:
                     break
         else:
             raise RuntimeError("Unsupported URL list file format")
-
 
 
 class MetaInfo:
@@ -355,19 +457,29 @@ class MetaInfo:
         if result.meta_info is not None:
             self.num_gitmodules += result.meta_info["has_gitmodules"]
             self.num_makefiles += result.meta_info["num_makefiles"]
-            self.makefiles_using_automake += result.meta_info["makefiles_using_automake"]
+            self.makefiles_using_automake += result.meta_info[
+                "makefiles_using_automake"
+            ]
 
         # new_makefiles: Dict[str, bool] = {}
         # old_makefiles: Dict[str, bool] = {}
         if result.makefiles is not None:
-            new_makefiles = {makefile["directory"]: makefile["success"]
-                             for makefile in result.makefiles}
+            new_makefiles = {
+                makefile["directory"]: makefile["success"]
+                for makefile in result.makefiles
+            }
             self.success_makefiles += sum(new_makefiles.values())
-            self.num_binaries += sum(len(makefile["binaries"]) for makefile in result.makefiles)
+            self.num_binaries += sum(
+                len(makefile["binaries"]) for makefile in result.makefiles
+            )
         elif result.repo_info.db_result is not None:
             db_result = result.repo_info.db_result
-            self.success_makefiles += sum(makefile["success"] for makefile in db_result["makefiles"])
-            self.num_binaries += sum(len(makefile["binaries"]) for makefile in db_result["makefiles"])
+            self.success_makefiles += sum(
+                makefile["success"] for makefile in db_result["makefiles"]
+            )
+            self.num_binaries += sum(
+                len(makefile["binaries"]) for makefile in db_result["makefiles"]
+            )
 
         # if result.repo_info.db_result is not None:
         #     old_makefiles = {makefile["directory"]: makefile["success"]
@@ -386,9 +498,11 @@ class MetaInfo:
         #         self.success_to_fail += 1
 
     def __repr__(self) -> str:
-        msg = f"#Repos: {self.num_repos} ({self.num_gitmodules} with .gitmodules), #Binaries: {self.num_binaries}\n" \
-              f"#Makefiles: {self.num_makefiles} ({self.success_makefiles} succeeded, " \
-              f"{self.makefiles_using_automake} using automake)"
+        msg = (
+            f"#Repos: {self.num_repos} ({self.num_gitmodules} with .gitmodules), #Binaries: {self.num_binaries}\n"
+            f"#Makefiles: {self.num_makefiles} ({self.success_makefiles} succeeded, "
+            f"{self.makefiles_using_automake} using automake)"
+        )
         # f" ├─ New: {self.added_makefiles}, Missing: {self.missing_makefiles}\n" \
         # f" └─ Fail->Success: {self.fail_to_success}, Success->Fail: {self.success_to_fail}"
         return msg
@@ -407,9 +521,16 @@ def main() -> None:
     flutes.log("Running with arguments:\n" + args.to_string(), force_console=True)
 
     if os.path.exists(args.clone_folder):
-        flutes.log(f"Removing contents of clone folder '{args.clone_folder}'...", "warning", force_console=True)
-        ghcc.utils.run_docker_command(["rm", "-rf", "/usr/src/*"], user=0,
-                                      directory_mapping={args.clone_folder: "/usr/src"})
+        flutes.log(
+            f"Removing contents of clone folder '{args.clone_folder}'...",
+            "warning",
+            force_console=True,
+        )
+        ghcc.utils.run_docker_command(
+            ["rm", "-rf", "/usr/src/*"],
+            user=0,
+            directory_mapping={args.clone_folder: "/usr/src"},
+        )
 
     flutes.log("Crawling starts...", "warning", force_console=True)
     db = ghcc.RepoDB()
@@ -427,14 +548,21 @@ def main() -> None:
         iterator = iter_repos(db, args.repo_list_file, args.max_repos)
         pipeline_fn: Callable[[RepoInfo], Optional[PipelineResult]] = functools.partial(
             clone_and_compile,
-            clone_folder=args.clone_folder, binary_folder=args.binary_folder, archive_folder=args.archive_folder,
+            clone_folder=args.clone_folder,
+            binary_folder=args.binary_folder,
+            archive_folder=args.archive_folder,
             recursive_clone=args.recursive_clone,
-            clone_timeout=args.clone_timeout, compile_timeout=args.compile_timeout,
-            force_reclone=args.force_reclone, force_recompile=args.force_recompile,
+            clone_timeout=args.clone_timeout,
+            compile_timeout=args.compile_timeout,
+            force_reclone=args.force_reclone,
+            force_recompile=args.force_recompile,
             docker_batch_compile=args.docker_batch_compile,
-            max_archive_size=args.max_archive_size, compression_type=args.compression_type,
-            record_libraries=(args.record_libraries is not None), record_metainfo=args.record_metainfo,
-            gcc_override_flags=args.gcc_override_flags)
+            max_archive_size=args.max_archive_size,
+            compression_type=args.compression_type,
+            record_libraries=(args.record_libraries is not None),
+            record_metainfo=args.record_metainfo,
+            gcc_override_flags=args.gcc_override_flags,
+        )
         repo_count = 0
         meta_info = MetaInfo()
         for result in pool.imap_unordered(pipeline_fn, iterator):
@@ -443,21 +571,51 @@ def main() -> None:
                 flutes.log(f"Processed {repo_count} repositories", force_console=True)
             if result is None:
                 continue
-            repo_owner, repo_name, repo_branch, repo_commit_id, repo_tag = result.repo_info.repo_owner, result.repo_info.repo_name, result.repo_info.repo_branch, result.repo_info.repo_commit_id, result.repo_info.repo_tag
+            repo_owner, repo_name, repo_branch, repo_commit_id, repo_tag = (
+                result.repo_info.repo_owner,
+                result.repo_info.repo_name,
+                result.repo_info.repo_branch,
+                result.repo_info.repo_commit_id,
+                result.repo_info.repo_tag,
+            )
             if args.write_db:
-                if result.clone_success is not None or result.repo_info.db_result is None:
+                if (
+                    result.clone_success is not None
+                    or result.repo_info.db_result is None
+                ):
                     # There's probably an inconsistency somewhere if we didn't clone while `db_result` is None.
                     # To prevent more errors, just add it to the DB.
-                    repo_size = result.repo_size or -1  # a value of zero is probably also wrong
-                    clone_success = result.clone_success if result.clone_success is not None else True
-                    db.add_repo(repo_owner, repo_name, repo_branch, repo_commit_id, repo_tag, clone_success, repo_size=repo_size)
+                    repo_size = (
+                        result.repo_size or -1
+                    )  # a value of zero is probably also wrong
+                    clone_success = (
+                        result.clone_success
+                        if result.clone_success is not None
+                        else True
+                    )
+                    db.add_repo(
+                        repo_owner,
+                        repo_name,
+                        repo_branch,
+                        repo_commit_id,
+                        repo_tag,
+                        clone_success,
+                        repo_size=repo_size,
+                    )
                     flutes.log(f"Added {repo_owner}/{repo_name} to DB")
                 if result.makefiles is not None:
-                    update_result = db.update_makefile(repo_owner, repo_name, result.makefiles,
-                                                       ignore_length_mismatch=True)
+                    update_result = db.update_makefile(
+                        repo_owner,
+                        repo_name,
+                        result.makefiles,
+                        ignore_length_mismatch=True,
+                    )
                     if not update_result:
-                        flutes.log(f"Makefiles of {repo_owner}/{repo_name} not saved to DB due to Unicode encoding "
-                                   f"errors", "error")
+                        flutes.log(
+                            f"Makefiles of {repo_owner}/{repo_name} not saved to DB due to Unicode encoding "
+                            f"errors",
+                            "error",
+                        )
             if result.libraries is not None:
                 libraries.update(result.libraries)
                 if repo_count % 10 == 0:  # flush every 10 repos
@@ -471,5 +629,5 @@ def main() -> None:
         flutes.log(repr(meta_info), force_console=True)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

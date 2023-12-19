@@ -42,10 +42,12 @@ def analyze_logs(path: str) -> Dict[str, InfoDict]:
         logs = f.read().split("\n")
 
     repo_info: Dict[str, InfoDict] = defaultdict(lambda: {tag: [] for tag in TAGS})
-    regex = re.compile(r"(?P<date_time>[0-9-]{10} [0-9:]{8}),\d{3} \w+: "
-                       r"(?P<n_success>\d+) \((?P<n_partial>\d+)\) out of (?P<n_total>\d+) Makefile\(s\) in "
-                       r"(?P<repo_owner>\w+)/(?P<repo_name>\w+) compiled \(partially\), "
-                       r"yielding (?P<n_binaries>\d+) binaries")
+    regex = re.compile(
+        r"(?P<date_time>[0-9-]{10} [0-9:]{8}),\d{3} \w+: "
+        r"(?P<n_success>\d+) \((?P<n_partial>\d+)\) out of (?P<n_total>\d+) Makefile\(s\) in "
+        r"(?P<repo_owner>\w+)/(?P<repo_name>\w+) compiled \(partially\), "
+        r"yielding (?P<n_binaries>\d+) binaries"
+    )
     for idx, line in enumerate(logs):
         match = regex.search(line)
         if match is not None:
@@ -67,8 +69,11 @@ def main():
     changed = changed_repos(repo_info)
 
     # Sample 100 failed repositories.
-    repos_with_fail = [repo for repo, info in repo_info.items()
-                       if info["n_partial"][-1] < info["n_total"][-1]]
+    repos_with_fail = [
+        repo
+        for repo, info in repo_info.items()
+        if info["n_partial"][-1] < info["n_total"][-1]
+    ]
     samples = np.random.choice(len(repos_with_fail), 100, replace=False)
     _repo_samples = [repos_with_fail[x] for x in samples]
 
@@ -98,7 +103,7 @@ def main():
             owner, name = repo.split("/")
             entry = db.get(owner, name)
             success_makefiles = set()
-            for makefile_info in entry['makefiles']:
+            for makefile_info in entry["makefiles"]:
                 directory = makefile_info["directory"]
                 directory = "/".join([owner, name] + directory.split("/")[4:])
                 success_makefiles.add(directory)
@@ -109,5 +114,5 @@ def main():
                 print(repo, directory, status)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

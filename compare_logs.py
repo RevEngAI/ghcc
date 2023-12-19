@@ -17,13 +17,17 @@ def parse_logs(path: str) -> Dict[str, Dict[str, int]]:
         logs = f.read().split("\n")
 
     repo_info: Dict[str, Dict[str, int]] = defaultdict(dict)
-    regex_success = re.compile(r"(?P<date_time>[0-9-]{10} [0-9:]{8}),\d{3} \w+: \(Worker \s*\d+\) "
-                               r"(?P<n_success>\d+) \((?P<n_partial>\d+)\) out of (?P<n_total>\d+) Makefile\(s\) in "
-                               r"(?P<repo_owner>\S+?)/(?P<repo_name>\S+?) compiled \(partially\), "
-                               r"yielding (?P<n_binaries>\d+) binaries")
-    regex_no_mkfile = re.compile(r"(?P<date_time>[0-9-]{10} [0-9:]{8}),\d{3} \w+: \(Worker \s*\d+\) "
-                                 r"No Makefiles found in (?P<repo_owner>\S+?)/(?P<repo_name>\S+?), "
-                                 r"repository deleted")
+    regex_success = re.compile(
+        r"(?P<date_time>[0-9-]{10} [0-9:]{8}),\d{3} \w+: \(Worker \s*\d+\) "
+        r"(?P<n_success>\d+) \((?P<n_partial>\d+)\) out of (?P<n_total>\d+) Makefile\(s\) in "
+        r"(?P<repo_owner>\S+?)/(?P<repo_name>\S+?) compiled \(partially\), "
+        r"yielding (?P<n_binaries>\d+) binaries"
+    )
+    regex_no_mkfile = re.compile(
+        r"(?P<date_time>[0-9-]{10} [0-9:]{8}),\d{3} \w+: \(Worker \s*\d+\) "
+        r"No Makefiles found in (?P<repo_owner>\S+?)/(?P<repo_name>\S+?), "
+        r"repository deleted"
+    )
     for idx, line in enumerate(logs):
         match = regex_success.search(line)
         if match is not None:
@@ -35,14 +39,18 @@ def parse_logs(path: str) -> Dict[str, Dict[str, int]]:
         else:
             match = regex_no_mkfile.search(line)
             if match is not None:
-                repo_owner, repo_name = match.group("repo_owner"), match.group("repo_name")
+                repo_owner, repo_name = match.group("repo_owner"), match.group(
+                    "repo_name"
+                )
                 repo_full_name = f"{repo_owner}/{repo_name}"
                 for tag in TAGS:
                     repo_info[repo_full_name][tag] = 0
     return repo_info
 
 
-def compare_logs(info_old: Dict[str, Dict[str, int]], info_new: Dict[str, Dict[str, int]]) -> Dict[str, DiffDict]:
+def compare_logs(
+    info_old: Dict[str, Dict[str, int]], info_new: Dict[str, Dict[str, int]]
+) -> Dict[str, DiffDict]:
     for repo_name in info_new:
         if repo_name not in info_old:
             flutes.log(f"{repo_name} missing in OLD log", "error")
@@ -73,12 +81,14 @@ def main():
 
     for tag in TAGS:
         print(tag)
-        pprint.pprint({
-            repo_name: diff[tag]
-            for repo_name, diff in repo_diff.items()
-            if tag in diff and diff[tag][0] > diff[tag][1]
-        })
+        pprint.pprint(
+            {
+                repo_name: diff[tag]
+                for repo_name, diff in repo_diff.items()
+                if tag in diff and diff[tag][0] > diff[tag][1]
+            }
+        )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

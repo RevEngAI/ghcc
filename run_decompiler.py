@@ -37,8 +37,8 @@ class Arguments(argtyped.Arguments):
 
 
 SCRIPTS_DIR = Path(__file__).parent / "scripts" / "decompiler_scripts"
-COLLECT = str((SCRIPTS_DIR / 'collect.py').absolute())
-DUMP_TREES = str((SCRIPTS_DIR / 'dump_trees.py').absolute())
+COLLECT = str((SCRIPTS_DIR / "collect.py").absolute())
+DUMP_TREES = str((SCRIPTS_DIR / "dump_trees.py").absolute())
 
 
 def make_directory(dir_path: str) -> None:
@@ -71,8 +71,12 @@ AAAAAAAAAAIAAAAAAAAAAAAAAAAAAAAAAAAATQABBQAAAAAAAAAAAAAAAGy/rUI=
         f.write(base64.decodebytes(encoded_registry_data))
 
 
-def run_decompiler(file_name: str, script: str, env: Optional[EnvDict] = None,
-                   timeout: Optional[int] = None):
+def run_decompiler(
+    file_name: str,
+    script: str,
+    env: Optional[EnvDict] = None,
+    timeout: Optional[int] = None,
+):
     r"""Run a decompiler script.
 
     :param file_name: The binary to be decompiled.
@@ -80,14 +84,14 @@ def run_decompiler(file_name: str, script: str, env: Optional[EnvDict] = None,
     :param script: The script file to run.
     :param timeout: Timeout in seconds (default no timeout).
     """
-    idacall = [args.ida, '-B', f'-S{script}', file_name]
+    idacall = [args.ida, "-B", f"-S{script}", file_name]
     try:
         flutes.run_command(idacall, env=env, timeout=timeout)
     except subprocess.CalledProcessError as e:
         if b"Traceback (most recent call last):" in e.output:
             # Exception raised by Python script called by IDA, throw it up.
             raise e
-        flutes.run_command(['rm', '-f', f'{file_name}.i64'])
+        flutes.run_command(["rm", "-f", f"{file_name}.i64"])
         if b"Corrupted pseudo-registry file" in e.output:
             write_pseudo_registry()
             # Run again without try-catch; if it fails, it should crash.
@@ -121,13 +125,19 @@ def exception_handler(e, binary_info: BinaryInfo):
 
 
 @flutes.exception_wrapper(exception_handler)
-def decompile(binary_info: BinaryInfo, output_dir: str, binary_dir: str,
-              timeout: Optional[int] = None) -> DecompilationResult:
+def decompile(
+    binary_info: BinaryInfo,
+    output_dir: str,
+    binary_dir: str,
+    timeout: Optional[int] = None,
+) -> DecompilationResult:
     binary_path = binary_info["path"]
     original_path = binary_info["path_in_repo"]
     binary_hash = os.path.split(binary_path)[1]
 
-    def create_result(status: DecompilationStatus, time: Optional[datetime.timedelta] = None) -> DecompilationResult:
+    def create_result(
+        status: DecompilationStatus, time: Optional[datetime.timedelta] = None
+    ) -> DecompilationResult:
         return DecompilationResult(binary_info, binary_hash, status, time)
 
     output_path = os.path.join(output_dir, f"{binary_hash}.jsonl")
@@ -137,25 +147,27 @@ def decompile(binary_info: BinaryInfo, output_dir: str, binary_dir: str,
 
     start = datetime.datetime.now()
     env: EnvDict = os.environ.copy()
-    env['IDALOG'] = '/dev/stdout'
-    env['PREFIX'] = binary_hash
+    env["IDALOG"] = "/dev/stdout"
+    env["PREFIX"] = binary_hash
     file_path = os.path.join(binary_dir, binary_path)
 
     # Create a temporary directory, since the decompiler makes a lot of additional
     # files that we can't clean up from here.
     with tempfile.TemporaryDirectory() as tempdir:
         # Put the output JSONL file here as well to prevent partially-generated files.
-        env['OUTPUT_DIR'] = os.path.abspath(tempdir)
+        env["OUTPUT_DIR"] = os.path.abspath(tempdir)
         with tempfile.NamedTemporaryFile(dir=tempdir) as collected_vars:
             # First collect variables.
-            env['COLLECTED_VARS'] = collected_vars.name
+            env["COLLECTED_VARS"] = collected_vars.name
             with tempfile.NamedTemporaryFile(dir=tempdir) as orig:
-                flutes.run_command(['cp', file_path, orig.name])
+                flutes.run_command(["cp", file_path, orig.name])
                 # Timeout after 30 seconds for first run.
                 try:
                     run_decompiler(orig.name, COLLECT, env=env, timeout=timeout)
                 except subprocess.TimeoutExpired:
-                    flutes.log(f"[TIMED OUT] {original_path} ({binary_path})", "warning")
+                    flutes.log(
+                        f"[TIMED OUT] {original_path} ({binary_path})", "warning"
+                    )
                     return create_result(DecompilationStatus.TimedOut)
                 try:
                     assert pickle.load(collected_vars)  # non-empty
@@ -164,22 +176,29 @@ def decompile(binary_info: BinaryInfo, output_dir: str, binary_dir: str,
                     return create_result(DecompilationStatus.NoVariables)
             # Make a new stripped copy and pass it the collected vars.
             with tempfile.NamedTemporaryFile(dir=tempdir) as stripped:
-                flutes.run_command(['cp', file_path, stripped.name])
-                flutes.run_command(['strip', '--strip-debug', stripped.name])
+                flutes.run_command(["cp", file_path, stripped.name])
+                flutes.run_command(["strip", "--strip-debug", stripped.name])
                 # Dump the trees.
                 # No timeout here, we know it'll run in a reasonable amount of
                 # time and don't want mismatched files.
                 run_decompiler(stripped.name, DUMP_TREES, env=env)
         jsonl_path = os.path.join(tempdir, f"{binary_hash}.jsonl")
-        flutes.run_command(['cp', jsonl_path, output_path])
+        flutes.run_command(["cp", jsonl_path, output_path])
     end = datetime.datetime.now()
     duration = end - start
-    flutes.log(f"[OK {duration.total_seconds():5.2f}s] {original_path} ({binary_path})", "success")
+    flutes.log(
+        f"[OK {duration.total_seconds():5.2f}s] {original_path} ({binary_path})",
+        "success",
+    )
     return create_result(DecompilationStatus.Success, duration)
 
 
-def iter_binaries(db: ghcc.BinaryDB, binaries: Dict[str, BinaryInfo]) -> Iterator[BinaryInfo]:
-    binary_entries = {entry["sha"]: entry for entry in db.collection.find()}  # getting stuff in batch is much faster
+def iter_binaries(
+    db: ghcc.BinaryDB, binaries: Dict[str, BinaryInfo]
+) -> Iterator[BinaryInfo]:
+    binary_entries = {
+        entry["sha"]: entry for entry in db.collection.find()
+    }  # getting stuff in batch is much faster
     skipped_count = 0
     migrated_count = 0
     for sha, info in binaries.items():
@@ -188,17 +207,25 @@ def iter_binaries(db: ghcc.BinaryDB, binaries: Dict[str, BinaryInfo]) -> Iterato
             if "repo_owner" in entry:
                 skipped_count += 1
             else:
-                db.collection.update_one({"_id": entry["_id"]}, {"$set": {
-                    "repo_owner": info["repo_owner"],
-                    "repo_name": info["repo_name"],
-                }})
+                db.collection.update_one(
+                    {"_id": entry["_id"]},
+                    {
+                        "$set": {
+                            "repo_owner": info["repo_owner"],
+                            "repo_name": info["repo_name"],
+                        }
+                    },
+                )
                 migrated_count += 1
             continue
         if migrated_count > 0:
             flutes.log(f"Migrated {migrated_count} binary entries", force_console=True)
             migrated_count = 0
         if skipped_count > 0:
-            flutes.log(f"Skipped {skipped_count} binaries that have been processed", force_console=True)
+            flutes.log(
+                f"Skipped {skipped_count} binaries that have been processed",
+                force_console=True,
+            )
             skipped_count = 0
         yield info
 
@@ -209,18 +236,27 @@ def get_binary_mapping(cache_path: Optional[str] = None) -> Dict[str, BinaryInfo
         binaries: Dict[str, BinaryInfo] = {}  # sha -> binary_info
         with contextlib.closing(ghcc.RepoDB()) as repo_db:
             all_repos = repo_db.collection.find()
-            for repo in tqdm.tqdm(all_repos, total=all_repos.count(), ncols=120, desc="Deduplicating binaries"):
+            for repo in tqdm.tqdm(
+                all_repos,
+                total=all_repos.count(),
+                ncols=120,
+                desc="Deduplicating binaries",
+            ):
                 prefix = f"{repo['repo_owner']}/{repo['repo_name']}"
-                for makefile in repo['makefiles']:
+                for makefile in repo["makefiles"]:
                     # Absolute Docker paths were used when compiling; remove them.
-                    directory = f"{prefix}/" + flutes.remove_prefix(makefile['directory'], "/usr/src/repo/")
-                    for path, sha in zip(makefile['binaries'], makefile['sha256']):
-                        binaries[sha] = BinaryInfo({
-                            "repo_owner": repo['repo_owner'],
-                            "repo_name": repo['repo_name'],
-                            "path": f"{prefix}/{sha}",
-                            "path_in_repo": f"{directory}/{path}",
-                        })
+                    directory = f"{prefix}/" + flutes.remove_prefix(
+                        makefile["directory"], "/usr/src/repo/"
+                    )
+                    for path, sha in zip(makefile["binaries"], makefile["sha256"]):
+                        binaries[sha] = BinaryInfo(
+                            {
+                                "repo_owner": repo["repo_owner"],
+                                "repo_name": repo["repo_name"],
+                                "path": f"{prefix}/{sha}",
+                                "path_in_repo": f"{directory}/{path}",
+                            }
+                        )
         return binaries
 
     return _compute_binary_mapping
@@ -236,8 +272,8 @@ def main() -> None:
     make_directory(args.output_dir)
 
     # Use RAM-backed memory for tmp if available
-    if os.path.exists('/dev/shm'):
-        tempfile.tempdir = '/dev/shm'
+    if os.path.exists("/dev/shm"):
+        tempfile.tempdir = "/dev/shm"
 
     flutes.set_log_file(args.log_file)
     write_pseudo_registry()
@@ -251,16 +287,24 @@ def main() -> None:
 
     with flutes.safe_pool(args.n_procs, closing=[db]) as pool:
         decompile_fn: Callable[[BinaryInfo], DecompilationResult] = functools.partial(
-            decompile, output_dir=args.output_dir, binary_dir=args.binaries_dir, timeout=args.timeout)
+            decompile,
+            output_dir=args.output_dir,
+            binary_dir=args.binaries_dir,
+            timeout=args.timeout,
+        )
         for result in pool.imap_unordered(decompile_fn, iter_binaries(db, binaries)):
             file_count += 1
             if result is not None:
-                db.add_binary(result.info["repo_owner"], result.info["repo_name"],
-                              result.hash, result.status is DecompilationStatus.Success)
+                db.add_binary(
+                    result.info["repo_owner"],
+                    result.info["repo_name"],
+                    result.hash,
+                    result.status is DecompilationStatus.Success,
+                )
             if file_count % 100 == 0:
                 flutes.log(f"Processed {file_count} binaries", force_console=True)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     args = Arguments()
     main()
