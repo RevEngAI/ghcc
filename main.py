@@ -9,6 +9,7 @@ r"""Run the cloning--compilation pipeline. What happens is:
 import functools
 import json
 import os
+from os.path import exists
 import shutil
 import subprocess
 from typing import Callable, Iterator, List, NamedTuple, Optional, Set
@@ -269,8 +270,27 @@ def clone_and_compile(
         #              f"Repository deleted", "warning")
         #     return PipelineResult(repo_info, clone_success=clone_success, makefiles=[])
 
-        # Stage 2: Finding Makefiles.
-        makefile_dirs = ghcc.find_makefiles(repo_path)
+        # Stage 1.5: Check if the project uses CMake, and if so, create a build directory
+        if ghcc.find_cmakefile(repo_path):
+            flutes.log(f"CMakeLists found in {repo_full_name}", "success")
+            try:
+                buildroot = os.path.join(repo_path, "ghcc_build")
+                os.makedirs(buildroot, exist_ok=True)
+                flutes.run_command(
+                    ["cmake", "../"], timeout=clone_timeout, cwd=buildroot
+                )
+                # Stage 2: Finding Makefiles.
+                makefile_dirs = ghcc.find_makefiles(buildroot)
+            except (subprocess.TimeoutExpired, subprocess.CalledProcessError) as e:
+                flutes.log(
+                    f"Error while trying to build with cmake:\n\n{e.output}", "error"
+                )
+                shutil.rmtree(repo_path)
+                # return dummy info
+                return PipelineResult(repo_info)
+        else:
+            # Stage 2: Finding Makefiles.
+            makefile_dirs = ghcc.find_makefiles(repo_path)
         if len(makefile_dirs) == 0:
             # Repo has no Makefiles, delete.
             shutil.rmtree(repo_path)

@@ -21,6 +21,7 @@ ELF_FILE_TAG = b"ELF"  # Linux
 
 __all__ = [
     "contains_files",
+    "find_cmakefile",
     "find_makefiles",
     "CompileErrorType",
     "CompileResult",
@@ -45,6 +46,15 @@ def contains_files(path: str, names: List[str]) -> bool:
     return False
 
 
+def find_cmakefile(path: str) -> bool:
+    r"""Check if the directory at the given path contains a cmake build file
+
+    :param path: Path to the directory to scan
+    :return: True if CMakeLists.txt is found in the directory, otherwise false
+    """
+    return os.path.exists(os.path.join(path, "CMakeLists.txt"))
+
+
 def find_makefiles(path: str) -> List[str]:
     r"""Find all subdirectories under the given directory that contains Makefiles.
 
@@ -52,7 +62,7 @@ def find_makefiles(path: str) -> List[str]:
     :return: A list of absolute paths to subdirectories that contain Makefiles.
     """
     directories = []
-    for subdir, dirs, files in os.walk(path):
+    for subdir, _, _ in os.walk(path):
         if contains_files(subdir, ["makefile"]):
             directories.append(subdir)
     return directories
