@@ -265,5 +265,7 @@ If you have specific requirements for the branch, commit_id, or tag for a repo, 
 ## TODO's
 
 - [ ] Ability to checkout certain commits for compilation
+  - [X] Update DB to store more repo details (branch, tag, commit_id)
+  - [ ] Update filesystem structure to capture tags/branchs/commit_ids
 - [ ] Compiler matrix for different versions and configurations
   - [ ] Enumerate over all tags
